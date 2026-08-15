@@ -1,0 +1,2088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Enterprise Petty Cash Ledger Portal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg-main: #0B1315;
+    --bg-surface: #121E20;
+    --bg-card: #18282B;
+    --border-color: #243B3F;
+    --border-focus: #10B981;
+
+    --primary: #10B981;
+    --primary-hover: #059669;
+    --primary-light: rgba(16, 185, 129, 0.12);
+
+    --debit: #F43F5E;
+    --debit-bg: rgba(244, 63, 94, 0.12);
+    --credit: #10B981;
+    --credit-bg: rgba(16, 185, 129, 0.12);
+
+    --amber: #F59E0B;
+    --amber-bg: rgba(245, 158, 11, 0.12);
+
+    --text-primary: #F1F5F9;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-primary);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; font-variant-numeric: tabular-nums; }
+  button, select, input, textarea { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+  header {
+    background: var(--bg-surface);
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px clamp(16px, 4vw, 40px);
+    position: sticky;
+    top: 0;
+    z-index: 40;
+  }
+  .header-container {
+    max-width: 1440px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+  }
+  .brand-group { display: flex; align-items: center; gap: 14px; }
+  .brand-badge {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, #10B981 0%, #047857 100%);
+    border-radius: var(--radius-md);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 20px; color: #fff;
+  }
+  .brand-text h1 { font-size: 18px; font-weight: 700; }
+  .brand-text p { font-size: 12px; color: var(--text-secondary); }
+
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .sync-pill {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--bg-card); padding: 6px 12px; border-radius: 40px;
+    border: 1px solid var(--border-color); font-size: 11.5px; font-weight: 600; color: var(--text-secondary);
+    cursor: pointer; transition: border-color .15s ease;
+  }
+  .sync-pill:hover { border-color: var(--primary); }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink:0; }
+  .sync-pill.ok .sync-dot { background: var(--primary); }
+  .sync-pill.error .sync-dot { background: var(--debit); }
+  .sync-pill.busy .sync-dot { background: var(--amber); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .pending-badge {
+    background: var(--amber); color: #1a1400; font-size: 10px; font-weight: 800;
+    border-radius: 20px; padding: 1px 6px; margin-left: 2px;
+  }
+
+  .user-badge {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--bg-card);
+    padding: 6px 14px;
+    border-radius: 40px;
+    border: 1px solid var(--border-color);
+  }
+  .user-role-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+
+  main {
+    max-width: 1440px;
+    margin: 0 auto;
+    width: 100%;
+    padding: 24px clamp(16px, 4vw, 40px) 60px;
+    flex: 1;
+  }
+
+  .config-banner {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    background: var(--amber-bg); border: 1px solid rgba(245,158,11,.35); color: #FCD34D;
+    padding: 10px 16px; border-radius: var(--radius-md); font-size: 12.5px; margin-bottom: 18px;
+  }
+  .config-banner b { color: #FDE68A; }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--primary); }
+  .kpi-card.debit::before { background: var(--debit); }
+  .kpi-card.credit::before { background: var(--credit); }
+  .kpi-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); }
+  .kpi-value { font-size: 26px; font-weight: 700; margin-top: 8px; }
+
+  .branch-nav-wrapper {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border-color);
+  }
+  .branch-tab {
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 8px 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+  }
+  .branch-tab:hover { background: var(--bg-card); color: var(--text-primary); }
+  .branch-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .toolbar-left, .toolbar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .input-search, .select-ctrl {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 14px;
+    border-radius: var(--radius-md);
+    font-size: 13px;
+    outline: none;
+    font-family: inherit;
+  }
+  .input-search:focus, .select-ctrl:focus { border-color: var(--border-focus); }
+
+  input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: 0.7; cursor: pointer; }
+  input[type="date"]:hover::-webkit-calendar-picker-indicator { opacity: 1; }
+
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    background: var(--primary);
+    color: #fff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s ease, opacity .15s ease;
+  }
+  .btn:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn.secondary { background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); }
+  .btn.secondary:hover:not(:disabled) { background: var(--bg-surface); }
+  .btn.danger { background: transparent; color: var(--debit); border: 1px solid rgba(244,63,94,.35); }
+  .btn.danger:hover:not(:disabled) { background: var(--debit-bg); }
+  .btn.sm { padding: 5px 10px; font-size: 12px; }
+
+  .dropdown-menu-wrap { position: relative; display: inline-block; }
+  .dropdown-menu {
+    display: none; position: absolute; right: 0; top: calc(100% + 6px);
+    background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-md);
+    min-width: 190px; box-shadow: var(--shadow); z-index: 30; overflow: hidden;
+  }
+  .dropdown-menu.open { display: block; }
+  .dropdown-menu button {
+    width: 100%; text-align: left; background: none; border: none; color: var(--text-primary);
+    padding: 10px 14px; font-size: 12.5px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+  }
+  .dropdown-menu button:hover { background: var(--bg-surface); }
+
+  .table-container {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    overflow-x: auto;
+  }
+  table.ledger-table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; white-space: nowrap; }
+  table.ledger-table thead { background: var(--bg-card); border-bottom: 1px solid var(--border-color); }
+  table.ledger-table th { padding: 12px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-secondary); font-weight: 700; }
+  table.ledger-table th.sortable { cursor: pointer; user-select: none; }
+  table.ledger-table th.sortable:hover { color: var(--text-primary); }
+  table.ledger-table th.sortable .sort-arrow { opacity: .5; margin-left: 3px; }
+  table.ledger-table th.sortable.active .sort-arrow { opacity: 1; color: var(--primary); }
+  table.ledger-table td { padding: 13px 14px; border-bottom: 1px solid var(--border-color); }
+  table.ledger-table tbody tr:hover { background: rgba(255, 255, 255, 0.015); }
+
+  .pagination-bar {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px; border-top: 1px solid var(--border-color); font-size: 12px; color: var(--text-secondary);
+  }
+  .pagination-controls { display: flex; align-items: center; gap: 6px; }
+  .page-btn {
+    background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary);
+    padding: 5px 10px; border-radius: var(--radius-sm); font-size: 12px; cursor: pointer;
+  }
+  .page-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .page-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+  .badge.credit { background: var(--credit-bg); color: var(--credit); }
+  .badge.debit { background: var(--debit-bg); color: var(--debit); }
+  .badge.pending { background: var(--amber-bg); color: var(--amber); }
+
+  .grid-branch-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+  .branch-summary-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 18px; cursor: pointer; transition: border-color .15s ease; }
+  .branch-summary-card:hover { border-color: var(--primary); }
+  .bsc-code { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+  .bsc-name { font-size: 16px; font-weight: 700; margin: 4px 0 12px; }
+  .bsc-balance { font-size: 20px; font-weight: 700; }
+  .bsc-meta { display: flex; justify-content: space-between; font-size: 11.5px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border-color); }
+
+  .analytics-card { background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 20px; }
+  .analytics-card h3 { font-size: 13px; margin-bottom: 14px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; font-size: 12px; }
+  .bar-label { width: 160px; flex-shrink: 0; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar-track { flex: 1; background: var(--bg-card); border-radius: 4px; height: 8px; overflow: hidden; }
+  .bar-fill { height: 100%; background: linear-gradient(90deg, var(--primary), #34D399); border-radius: 4px; }
+  .bar-value { width: 90px; text-align: right; flex-shrink: 0; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.75); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .overlay.open { display: flex; }
+  .overlay.slide-panel { justify-content: flex-end; }
+
+  .slide-drawer {
+    width: min(640px, 100%);
+    background: var(--bg-surface);
+    height: 100%;
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    box-shadow: -15px 0 35px rgba(0,0,0,0.5);
+  }
+  .drawer-header { padding: 18px 24px; background: var(--bg-card); border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; }
+  .drawer-body { padding: 24px; overflow-y: auto; flex: 1; }
+  .drawer-footer { padding: 16px 24px; background: var(--bg-card); border-top: 1px solid var(--border-color); display: flex; gap: 12px; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 11.5px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 5px; font-weight: 700; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-row.row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .form-ctrl { width: 100%; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; }
+  .form-ctrl:focus { border-color: var(--border-focus); outline: none; }
+
+  .dir-selector { display: flex; gap: 8px; margin-bottom: 18px; }
+  .dir-btn {
+    flex: 1; padding: 10px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border-color); background: var(--bg-card);
+    color: var(--text-secondary); cursor: pointer; font-weight: 700; font-size: 13px;
+  }
+  .dir-btn.active.in { border-color: var(--credit); background: var(--credit-bg); color: var(--credit); }
+  .dir-btn.active.out { border-color: var(--debit); background: var(--debit-bg); color: var(--debit); }
+  .dir-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+  .section-accordion {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 12px 16px;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(255,255,255,0.02);
+  }
+  .section-body { padding: 16px; border-top: 1px solid var(--border-color); }
+
+  /* Toasts */
+  .toast-stack { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 10px; max-width: 360px; }
+  .toast {
+    background: var(--bg-card); border: 1px solid var(--border-color); border-left: 4px solid var(--primary);
+    border-radius: var(--radius-md); padding: 12px 16px; font-size: 12.5px; box-shadow: var(--shadow);
+    animation: toastIn .2s ease; display: flex; gap: 10px; align-items: flex-start;
+  }
+  .toast.error { border-left-color: var(--debit); }
+  .toast.warn { border-left-color: var(--amber); }
+  @keyframes toastIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+  .toast button { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 14px; margin-left: auto; }
+
+  @media print {
+    header, .toolbar, .branch-nav-wrapper, .btn, .pagination-bar, .toast-stack, .config-banner { display: none !important; }
+    body { background: #fff; color: #000; }
+    .table-container, .kpi-card { border-color: #ccc; background: #fff; }
+  }
+</style>
+</head>
+<body>
+
+<!-- TOP HEADER -->
+<header>
+  <div class="header-container">
+    <div class="brand-group">
+      <div class="brand-badge">₹</div>
+      <div class="brand-text">
+        <h1>Petty Cash System</h1>
+        <p>Enterprise Branch-Wise Accounting</p>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="sync-pill" id="syncPill" onclick="manualSync()" title="Click to sync now">
+        <span class="sync-dot"></span>
+        <span id="syncLabel">Connecting…</span>
+        <span class="pending-badge" id="pendingBadge" style="display:none;">0</span>
+      </div>
+      <div class="user-badge">
+        <span class="user-role-dot"></span>
+        <span id="activeUserLabel" style="font-size: 12.5px; font-weight: 600;"></span>
+        <button class="btn sm secondary" onclick="logout()" style="margin-left: 6px;">Sign Out</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- MAIN APP BODY -->
+<main id="mainApp"></main>
+
+<!-- TOASTS -->
+<div class="toast-stack" id="toastStack"></div>
+
+<!-- COMPREHENSIVE ENTRY FORM DRAWER -->
+<div class="overlay slide-panel" id="entryDrawer">
+  <div class="slide-drawer">
+    <div class="drawer-header">
+      <h3 style="font-size: 17px;" id="drawerTitle">New Cash Transaction</h3>
+      <button onclick="closeDrawer()" style="background:none; border:none; color:var(--text-secondary); font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <div class="drawer-body">
+
+      <!-- Direction Toggle -->
+      <div class="dir-selector">
+        <button type="button" class="dir-btn in active" id="btnInflow" onclick="setEntryDirection('in')">↓ Cash Received (Inflow)</button>
+        <button type="button" class="dir-btn out" id="btnOutflow" onclick="setEntryDirection('out')">↑ Cash Expense (Outflow)</button>
+      </div>
+
+      <!-- Basic Date & Branch info -->
+      <div class="form-row">
+        <div class="form-group">
+          <label>Branch *</label>
+          <select class="form-ctrl" id="fBranch" onchange="onDrawerBranchChange()"></select>
+        </div>
+        <div class="form-group">
+          <label>Date *</label>
+          <input type="date" class="form-ctrl" id="fDate">
+        </div>
+      </div>
+
+      <!-- Categories & Types -->
+      <div class="form-row" id="rowExpenseHierarchy">
+        <div class="form-group" id="groupExpenseType" style="display:none;">
+          <label>Expense Type *</label>
+          <select class="form-ctrl" id="fExpenseType" onchange="onExpenseTypeChange()"></select>
+        </div>
+        <div class="form-group" style="grid-column: span 2;" id="groupCategory">
+          <label id="lblCategoryTitle">Credit Source / Category *</label>
+          <select class="form-ctrl" id="fCategory"></select>
+        </div>
+      </div>
+
+      <!-- Amount & Basic Identification -->
+      <div class="form-row">
+        <div class="form-group">
+          <label id="lblAmountTitle">Received Amount (₹) *</label>
+          <input type="number" class="form-ctrl" id="fAmount" min="0" step="0.01" placeholder="0.00">
+        </div>
+        <div class="form-group" id="fieldInflowUTR">
+          <label>Received Amount UTR / Ref No</label>
+          <input type="text" class="form-ctrl" id="fUTR" placeholder="e.g. UTR890123 / Cheque No">
+        </div>
+        <div class="form-group" id="fieldOutflowPerson" style="display:none;">
+          <label>Person Name / Paid to Name</label>
+          <input type="text" class="form-ctrl" id="fPerson" placeholder="Name of Person / Vendor">
+        </div>
+      </div>
+
+      <!-- EXPENSE SECTION 1: Core Roles & Division -->
+      <div class="expense-only-block" style="display:none;">
+        <div class="section-accordion">
+          <div class="section-header" onclick="toggleAccordion('secStaff')">
+            <span>Division, Staff & Expense Segment</span>
+            <span id="secStaff-arrow">▾</span>
+          </div>
+          <div class="section-body" id="secStaff">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Division</label>
+                <select class="form-ctrl" id="fDivision">
+                  <option value="">— Select —</option>
+                  <option value="Operations">Operations</option>
+                  <option value="Sales">Sales</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Expense Segment</label>
+                <select class="form-ctrl" id="fBizCategory">
+                  <option value="">— Select —</option>
+                  <option value="Dealer/Channel Sales">Dealer/Channel Sales</option>
+                  <option value="ATM">ATM</option>
+                  <option value="Non ATM">Non ATM</option>
+                  <option value="Branch">Branch</option>
+                  <option value="Tender">Tender</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Expense Group</label>
+                <select class="form-ctrl" id="fExpenseGroup" onchange="onExpenseGroupChange()">
+                  <option value="">— Select —</option>
+                  <option value="Branch Person">Branch Person</option>
+                  <option value="Engineer">Engineer</option>
+                  <option value="TRC Person">TRC Person</option>
+                  <option value="Sales Person">Sales Person</option>
+                  <option value="Direct Vendor">Direct Vendor</option>
+                  <option value="3rd Party">3rd Party</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label id="lblEmployee">Employee Name</label>
+                <div id="employeeControlContainer">
+                  <select class="form-ctrl" id="fEngineerSelect">
+                    <option value="">— Select Employee —</option>
+                  </select>
+                  <input type="text" class="form-ctrl" id="fEngineerInput" placeholder="Enter Name / Party / Vendor" style="display:none;">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXPENSE SECTION 2: Client & Site Info -->
+        <div class="section-accordion">
+          <div class="section-header" onclick="toggleAccordion('secSite')">
+            <span>Site, Customer & Ticket Info</span>
+            <span id="secSite-arrow">▾</span>
+          </div>
+          <div class="section-body" id="secSite">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Customer Name</label>
+                <input type="text" class="form-ctrl" id="fCustomerName" placeholder="Client / Bank / Corporate">
+              </div>
+              <div class="form-group">
+                <label>Voucher No</label>
+                <input type="text" class="form-ctrl" id="fVoucher" placeholder="e.g. VCH-001">
+              </div>
+            </div>
+            <div class="form-row row-3">
+              <div class="form-group">
+                <label>Ticket No</label>
+                <input type="text" class="form-ctrl" id="fTicket" placeholder="e.g. TK-8802">
+              </div>
+              <div class="form-group">
+                <label>UID No</label>
+                <input type="text" class="form-ctrl" id="fUid" placeholder="Prostar UID">
+              </div>
+              <div class="form-group">
+                <label>ATM ID / Site ID</label>
+                <input type="text" class="form-ctrl" id="fAtmSiteId" placeholder="ATM / Site Code">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Site Address</label>
+              <textarea class="form-ctrl" id="fSiteAddress" rows="1" placeholder="Location address of work"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXPENSE SECTION 3: Logistics & Transporter Details -->
+        <div class="section-accordion">
+          <div class="section-header" onclick="toggleAccordion('secLogistics')">
+            <span>Logistics, Movement & Transporter</span>
+            <span id="secLogistics-arrow">▾</span>
+          </div>
+          <div class="section-body" id="secLogistics">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Inward / Outward Material</label>
+                <select class="form-ctrl" id="fInOutMaterial">
+                  <option value="">— Select —</option>
+                  <option value="Inward">Inward</option>
+                  <option value="Outward">Outward</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Material Details</label>
+                <input type="text" class="form-ctrl" id="fMaterialDetails" placeholder="UPS, Battery, Spare...">
+              </div>
+            </div>
+            <div class="form-row row-3">
+              <div class="form-group">
+                <label>From Location</label>
+                <input type="text" class="form-ctrl" id="fFromLoc" placeholder="Origin">
+              </div>
+              <div class="form-group">
+                <label>To Location</label>
+                <input type="text" class="form-ctrl" id="fToLoc" placeholder="Destination">
+              </div>
+              <div class="form-group">
+                <label>Distance / Place</label>
+                <input type="text" class="form-ctrl" id="fDistancePlace" placeholder="e.g. 45 Km / City">
+              </div>
+            </div>
+            <div class="form-row row-3">
+              <div class="form-group">
+                <label>Transporter Co.</label>
+                <input type="text" class="form-ctrl" id="fTransporterCo" placeholder="Courier / Truck Co.">
+              </div>
+              <div class="form-group">
+                <label>Vehicle No</label>
+                <input type="text" class="form-ctrl" id="fVehicleNo" placeholder="MH-04-XX-0000">
+              </div>
+              <div class="form-group">
+                <label>Transporter Contact</label>
+                <input type="text" class="form-ctrl" id="fTransporterContact" placeholder="Driver / Phone">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- EXPENSE SECTION 4: Invoicing & Billing -->
+        <div class="section-accordion">
+          <div class="section-header" onclick="toggleAccordion('secInvoice')">
+            <span>Invoice, GSTIN & LR Details</span>
+            <span id="secInvoice-arrow">▾</span>
+          </div>
+          <div class="section-body" id="secInvoice">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Invoice No</label>
+                <input type="text" class="form-ctrl" id="fInvoiceNo" placeholder="Bill / Tax Invoice No">
+              </div>
+              <div class="form-group">
+                <label>Invoice Date</label>
+                <input type="date" class="form-ctrl" id="fInvoiceDate">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Vendor GSTIN No</label>
+                <input type="text" class="form-ctrl" id="fVendorGstin" placeholder="GSTIN Number">
+              </div>
+              <div class="form-group">
+                <label>LR / POD Number</label>
+                <input type="text" class="form-ctrl" id="fLrPodNo" placeholder="Docket / POD / LR No">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Approvals & Remarks -->
+      <div class="form-group">
+        <label>Approval Taken from Person Name</label>
+        <input type="text" class="form-ctrl" id="fHOApproval" placeholder="Approved by Manager / HO Person">
+      </div>
+
+      <div class="form-group">
+        <label>Detailed Remark</label>
+        <textarea class="form-ctrl" id="fRemark" rows="2" placeholder="Purpose, detailed notes, specific instructions..."></textarea>
+      </div>
+
+      <!-- Document Image Upload -->
+      <div class="form-group">
+        <label>Document Image / Invoice Receipt Upload <span style="text-transform:none; font-weight:400;">(max 3MB)</span></label>
+        <input type="file" class="form-ctrl" id="fDocUpload" accept="image/*,.pdf" onchange="previewUploadedDoc(this)">
+        <div id="docPreviewName" style="font-size:11.5px; color:var(--primary); margin-top:4px; display:none;"></div>
+      </div>
+
+      <div id="formError" style="color: var(--debit); font-size: 12px; display: none;">Please provide required fields: Date, Amount, and Category.</div>
+    </div>
+    <div class="drawer-footer">
+      <button class="btn secondary" style="flex:1" onclick="closeDrawer()">Cancel</button>
+      <button class="btn" style="flex:1" id="saveEntryBtn" onclick="saveDrawerEntry()">Save Record</button>
+    </div>
+  </div>
+</div>
+
+<!-- ENTRY DETAIL FULL INSPECTION MODAL -->
+<div class="overlay" id="detailModal">
+  <div class="login-card" style="width:min(680px, 94%); max-height:88vh; overflow-y:auto; text-align:left; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 36px 28px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <h3 style="font-size:17px;">Transaction Complete 41-Field Record</h3>
+      <button onclick="document.getElementById('detailModal').classList.remove('open')" style="background:none; border:none; color:var(--text-secondary); font-size:20px; cursor:pointer;">✕</button>
+    </div>
+    <div id="detailModalContent" style="font-size:13px; line-height:1.8; color:var(--text-secondary);"></div>
+  </div>
+</div>
+
+<!-- CONFIRM DIALOG (replaces window.confirm for delete) -->
+<div class="overlay" id="confirmModal">
+  <div class="login-card" style="width:min(400px, 92%); text-align:left; background: var(--bg-surface); border: 1px solid var(--border-color); border-radius: var(--radius-lg); padding: 26px 24px;">
+    <h3 style="font-size:15px; margin-bottom:8px;" id="confirmTitle">Delete this record?</h3>
+    <p style="font-size:12.5px; color:var(--text-secondary); margin-bottom:18px;" id="confirmBody">This action cannot be undone.</p>
+    <div style="display:flex; gap:10px;">
+      <button class="btn secondary" style="flex:1" onclick="closeConfirm()">Cancel</button>
+      <button class="btn danger" style="flex:1; background:var(--debit); color:#fff; border:none;" id="confirmActionBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   BACKEND CONFIG (POWER AUTOMATE)
+   Paste your Power Automate HTTP-trigger flow URLs here.
+   See POWER_AUTOMATE_SETUP.md for exact flow steps + schema.
+============================================================ */
+const API_ENDPOINTS = {
+  GET_RECORDS: "https://8549b42c711be8948675eefb5cf215.dd.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/13/workflows/2c7ae011f4964e57b7b0835de6a0d6d1/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=okU1wqx0iAmNYQVTqWeVlRmw76q7Jy387I9Po2HmFvU",
+  ADD_RECORD: "https://8549b42c711be8948675eefb5cf215.dd.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/04/workflows/42c17ce44a3947458f3b837bf6a823db/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=EqmQYo67GkiuIdzxawvG_vuZGhNFWwChcg_VifsIisg",
+  UPDATE_RECORD: "https://8549b42c711be8948675eefb5cf215.dd.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/30/workflows/c5fd8a7d58754041b987859213decd3e/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=b81qJgKABrqE-oUlbZ7oDB5GcGkKCCXyqU7w-MCpJWk",
+  DELETE_RECORD: "https://8549b42c711be8948675eefb5cf215.dd.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/09/workflows/7c84030d99c548968d176ca8766ded32/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=SA3wCeE2UxphoiklHYwiv0vcWX7zUhrJUwUrjudHYmQ"
+};
+const API_KEY = ""; // optional shared secret sent as X-API-Key header — must match your flow's condition check
+const REQUEST_TIMEOUT_MS = 15000;
+const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024; // 3MB
+const AUTO_SYNC_INTERVAL_MS = 30000;
+const SESSION_MAX_AGE_MS = 8 * 60 * 60 * 1000;
+
+function isConfigured(url) { return typeof url === 'string' && url.indexOf('REPLACE_WITH') !== 0; }
+
+/* --- MASTER CONFIG & LOOKUPS --- */
+const BRANCH_CONFIG = [
+  {code:"AS_Guwahati", name:"Guwahati"}, {code:"BH_Patna", name:"Patna"},
+  {code:"CG_Chhattisgarh", name:"Chhattisgarh"}, {code:"GJ_Ahmedabad", name:"Ahmedabad"},
+  {code:"JK_Jammu", name:"Jammu"}, {code:"JH_Ranchi", name:"Ranchi"},
+  {code:"KL_Kerala", name:"Kerala"}, {code:"KN_Bangalore", name:"Bangalore"},
+  {code:"MH_Mumbai", name:"Mumbai"}, {code:"MH_Nagpur", name:"Nagpur"},
+  {code:"MH_Pune", name:"Pune"}, {code:"MP_Bhopal", name:"Bhopal"},
+  {code:"OD_Bhubaneswar", name:"Bhubaneswar"}, {code:"PN_Mohali", name:"Mohali"},
+  {code:"RJ_Jaipur", name:"Jaipur"}, {code:"TL_Hyderabad", name:"Hyderabad"},
+  {code:"TN_Chennai", name:"Chennai"}, {code:"TN_Coimbatore", name:"Coimbatore"},
+  {code:"UP_Lucknow", name:"Lucknow"}, {code:"UP_Noida", name:"Noida"},
+  {code:"WB_Kolkata", name:"Kolkata"}
+];
+
+const LOOKUP_MONTH_TYPES = {
+  1: "A Jan", 2: "B Feb", 3: "C Mar", 4: "D Apr", 5: "E May", 6: "F Jun",
+  7: "G Jul", 8: "H Aug", 9: "I Sep", 10: "J Oct", 11: "K Nov", 12: "L Dec"
+};
+
+const LOOKUP_CREDIT_TYPES = {
+  "Credit Received": ["Petty Cash Received", "Scrap Sold", "Carried Forward from Last Month"]
+};
+
+const LOOKUP_EXPENSE_TYPES = {
+  "3rd Party Engineer Payment": ["3rd Party Engineer Payment"],
+  "Fabrication Expense": ["Fabrication - Alteration", "Fabrication - New"],
+  "Loading & Unloading Charges": [
+    "Loading Material at Branch", "Un-Loading Material at Branch",
+    "Loading Material at Customer Site", "Un-Loading Material at Customer Site",
+    "Loading Material to BUS", "Un-Loading Material from BUS",
+    "Loading / Un-Loading Material Within Branch"
+  ],
+  "Office Expense": [
+    "AC Technician Payment", "Broadband", "Drinking Water Suppy", "Electric Consumption",
+    "Hardwares & Electrics -", "Tools & Equipment Expenses - TRC", "House Keeping",
+    "Misc. Office Expense", "Courier Charges", "Rent", "Stationery", "Tea / Coffee / Snacks"
+  ],
+  "Stay Expense": ["Dormitary", "Hotel", "Lodge"],
+  "Transport Expense": ["Bus", "Bus & Auto", "Goods Auto", "Large Truck", "Small Tempo", "Taxi", "Local Transporter", "Porter"],
+  "Travel Expense": ["Bike - Self", "Bus", "Taxi/Cab"]
+};
+
+/* --- MASTER EMPLOYEE / STAFF LIST MAPPED PER BRANCH AND GROUP --- */
+const BRANCH_STAFF_MAP = {
+  "AS_Guwahati": {
+    "Branch Person": [
+      "PM1664 - Titu Shill"
+    ],
+    "Engineer": [
+      "PM1677 - Ashik Hussain Mazumdar",
+      "PM1690 - Biju Sutradhar",
+      "PM1312 - Katwal Sombahadur",
+      "PM1317 - Phulen Mahato"
+    ]
+  },
+  "BH_Patna": {
+    "Branch Person": [
+      "PM1527 - MUTHUMARI IYAPPAN",
+      "PM1639 - Mohit Kumar",
+      "PM1516 - Vikas Kumar Roy",
+      "PM1773 - Tabish  Anwar",
+      "PM1313 - Krishna Mohan Thakur",
+      "PM1477 - Sandeep Chaudhary"
+    ],
+    "Engineer": [
+      "PM1561 - Satyam Shekhar",
+      "PM1304 - Dablu Yadav",
+      "PM145 - Ashok Kumar Bale Mahato",
+      "PM1297 - Ashok Kumar",
+      "PM1543 - Pawan Kumar Singh",
+      "PM1319 - Pramod Sharma",
+      "PM1314 - Mukesh Kumar",
+      "PM1711 - Manish Kumar",
+      "PM1298 - Binod Kumar Kamat",
+      "PM1316 - Nitish Kumar",
+      "PM1712 - Mukesh Ray",
+      "PM1307 - Dhirendra Kumar",
+      "PM1321 - Ramakant Suman",
+      "PM738 - Shivraj Singh",
+      "PM1296 - Aman Kumar",
+      "PM1328 - Sikesh Kumar Patel",
+      "PM1580 - Chandeshwar Kumar",
+      "PM1710 - Chhotu Kumar",
+      "PM1713 - Ravin Kumar"
+    ],
+    "TRC Person": [
+      "PM023 - Balkrishna Yadav"
+    ]
+  },
+  "CG_Chhattisgarh": {
+    "Engineer": [
+      "PM1463 - Jayprakash Pardhi",
+      "PM1399 - Manoj Kumar",
+      "PM1396 - Mahendra Singh Mandawi"
+    ]
+  },
+  "GJ_Ahmedabad": {
+    "Branch Person": [
+      "PM026 - Nandipkumar Vitthalbhai Patel",
+      "PM1431 - Thakor Sanjaykumar Diluji"
+    ],
+    "TRC Person": [
+      "PM1172 - Parmar Mukesh"
+    ],
+    "Engineer": [
+      "PM1520 - Sachin Mishra",
+      "PM1104 - Chandreshkumar Gajananbhai Raval",
+      "PM1373 - Anil Gupta",
+      "PM1384 - Gaurishankar Gopallal Sharma"
+    ]
+  },
+  "JH_Ranchi": {
+    "Branch Person": [
+      "PM822 - Anil Kumar Pandey"
+    ],
+    "Engineer": [
+      "PM1306 - Dhiren Kumar Ohdar",
+      "PM197 - Sanjay Rajender Yadav",
+      "PM1327 - Shubham Mishra",
+      "PM1309 - Ganesh Kumar Chatterjee",
+      "PM1331 - Vinod Oraon"
+    ]
+  },
+  "JK_Jammu": {
+    "Branch Person": [
+      "PM1599 - Jitinder Pal Singh",
+      "PM1728 - Jagdeep Verma"
+    ],
+    "Engineer": [
+      "PM1592 - Wakeel Ahmad Khandi",
+      "PM1654 - Vishal Verma",
+      "PM1590 - Nadeem Iqbal Khan",
+      "PM1593 - Akif Parvez"
+    ]
+  },
+  "KL_Kerala": {
+    "Engineer": [
+      "PM1792 - Binoy R Chandradas"
+    ]
+  },
+  "KN_Bangalore": {
+    "Branch Person": [
+      "PM1672 - Shyam Ravi",
+      "PM1602 - John Peter T",
+      "PM086 - Naveenkumar S.G.Puttaswamy P",
+      "PM684 - Prabhu M",
+      "PM1438 - Pavan Kumar H J",
+      "PM1791 - Sangayya S Mathapati"
+    ],
+    "Engineer": [
+      "PM1136 - Kiran Kumar",
+      "PM1474 - Rakesh Devadiga",
+      "PM1480 - Vijaykumar Chikkamath",
+      "PM1464 - K Nagesh",
+      "PM1395 - Madhura S",
+      "PM1376 - Basavaraj R Begewadi",
+      "PM591 - Dhanush.M",
+      "PM281 - Anand",
+      "PM1209 - Daval Sab",
+      "PM1211 - Sunil Kumar Y P"
+    ],
+    "TRC Person": [
+      "PM683 - Nethravathi. G"
+    ]
+  },
+  "MH_Mumbai": {
+    "Engineer": [
+      "PM1459 - Govinda Rajendra Pardeshi",
+      "PM1523 - Abdul Riyaz",
+      "PM1421 - Shrikrishna Sopan Ghyar",
+      "PM1427 - Subhash Ananda Shelake",
+      "PM1693 - Harsh Hemant Bhadak",
+      "PM1386 - Hirasing Tejsing Mahajan",
+      "PM1698 - Suraj Kadam",
+      "PM1410 - Rahul Chandrakant Mane",
+      "PM1401 - Mayur Vilas Waikar",
+      "PM1406 - Pandurang Dadarao Hakale"
+    ]
+  },
+  "MH_Nagpur": {
+    "TRC Person": [
+      "PM481 - Kantesh Karmore"
+    ],
+    "Engineer": [
+      "PM1436 - Visha Krupalsing Patle",
+      "PM1402 - Mohammad Ishtiyaque Abdul Shaikhji",
+      "PM1411 - Rajendra Damodhar Ikhe"
+    ],
+    "Branch Person": [
+      "PM1208 - Swapnil Dhanraj Fulzele"
+    ]
+  },
+  "MH_Pune": {
+    "Engineer": [
+      "PM1153 - Ramdas Vasant Chaudhari",
+      "PM1408 - Pratik Kiran Salve"
+    ]
+  },
+  "MP_Bhopal": {
+    "Branch Person": [
+      "PM064 - Arun Chainlal Nangvanshi",
+      "PM1212 - Rishi"
+    ],
+    "Engineer": [
+      "PM1629 - VISHAL VERMA",
+      "PM1419 - Sharad Patil",
+      "PM1380 - Brajesh Raghuwanshi",
+      "PM1655 - Rahul Keshwar",
+      "PM1652 - Mohit Kumar",
+      "PM1388 - Kalu Singh",
+      "PM1414 - Rakesh Arya"
+    ]
+  },
+  "OD_Bhubaneswar": {
+    "Branch Person": [
+      "PM1099 - Romance Mahapatra",
+      "PM1489 - Subha Prakash Behera"
+    ],
+    "Engineer": [
+      "PM1501 - Jyoti Ranjan Pradhan",
+      "PM1302 - Chinmaya Nayak",
+      "PM1788 - Priti Ranjan Rout",
+      "PM1689 - Deepak Kumar Bhol",
+      "PM1730 - Prittam Kumar Das",
+      "PM1772 - Ganesh Giri"
+    ]
+  },
+  "PN_Mohali": {
+    "Branch Person": [
+      "PM1600 - Ankit Taneja",
+      "PM1620 - Amod Kumar",
+      "PM1575 - Sunny Kumar",
+      "PM1094 - Sunil Kumar"
+    ],
+    "Engineer": [
+      "PM1736 - Rajesh Kumar",
+      "PM1430 - Sunil Kumar",
+      "PM1405 - Om Prakash Yadav",
+      "PM1641 - Balram Balram",
+      "PM1608 - Deepak Sharma",
+      "PM1377 - Bhagwant Singh",
+      "PM1749 - Shishpal Bharat Singh",
+      "PM1390 - Kapil Jain",
+      "PM1392 - Kuldeep"
+    ]
+  },
+  "RJ_Jaipur": {
+    "Branch Person": [
+      "PM143 - Shyamsunder Ramniwas Sharma",
+      "PM821 - Mahesh Kumar Jangid",
+      "PM1579 - Abhishek  Kumar"
+    ],
+    "Engineer": [
+      "PM1466 - Mahendra Singh Choudhary",
+      "PM1541 - Narendra Devanda",
+      "PM1475 - Rakesh Kumar Sharma",
+      "PM1462 - Jagdish Chandravanshi",
+      "PM1385 - Hariom Sharma",
+      "PM1368 - Ramesh Sharma",
+      "PM1456 - Daulat Jatav"
+    ]
+  },
+  "TL_Hyderabad": {
+    "Branch Person": [
+      "PM1621 - Gabriel Raj Chindada",
+      "PM1745 - Sai Amrit Addanki Tirumala ."
+    ],
+    "TRC Person": [
+      "PM007 - Parmeshawar Gundappa Jaje",
+      "PM1793 - Vallepu Venugopal"
+    ],
+    "Engineer": [
+      "PM1660 - BANOTH SURESH",
+      "PM1688 - Madhusudhan Donga",
+      "PM1691 - Dhilleswara Rao",
+      "PM1633 - Venkata Narayana Kolusu",
+      "PM1476 - Ravva Venkata Suryanarayana Raju",
+      "PM1646 - Arigila Siva",
+      "PM1457 - Voggu Vijaya Manikanta",
+      "PM1434 - Vamshi Shakati",
+      "PM1658 - SIDHARTHA VADDESWARAPU"
+    ]
+  },
+  "TN_Chennai": {
+    "Branch Person": [
+      "PM1625 - Pethuramasamy N.R.B",
+      "PM1663 - Janaki Raman Ganapathy",
+      "PM028 - K.Kalaivani"
+    ],
+    "TRC Person": [
+      "PM1467 - Meivelu Alagumani"
+    ],
+    "Engineer": [
+      "PM1465 - KARTHICK A",
+      "PM1429 - Sugumar Selvam",
+      "PM1450 - BARATHIKUMAR",
+      "PM1393 - Kumar Nanthan"
+    ]
+  },
+  "TN_Coimbatore": {
+    "Branch Person": [
+      "PM806 - Karthikayen P"
+    ],
+    "Engineer": [
+      "PM1469 - N Sivakumar",
+      "PM1775 - Chibe U",
+      "PM1790 - Samuel",
+      "PM1425 - Sivasankar S"
+    ]
+  },
+  "UP_Lucknow": {
+    "Branch Person": [
+      "PM1506 - Anjani Kumar Yadav",
+      "PM1717 - Anurag Yadav",
+      "PM1235 - Ajendra Singh"
+    ],
+    "TRC Person": [
+      "PM154 - Nekram Singh"
+    ],
+    "Engineer": [
+      "PM1350 - Shiv Kumar",
+      "PM1413 - Rakesh",
+      "PM1378 - Bharat Tripathi",
+      "PM1428 - Sudeep Sharma",
+      "PM1642 - Suresh Chand",
+      "PM1409 - Prem Chand",
+      "PM1494 - Sumit Vishwakarma",
+      "PM1416 - Ramdarash Singh Yadav",
+      "PM1415 - Rakesh Kumar",
+      "PM1287 - Mukul Prajapati",
+      "PM1714 - Ankush Sharma",
+      "PM1426 - Somesh Kumar",
+      "PM1795 - Raees Ansari",
+      "PM1407 - Pradeep Kumar",
+      "PM1615 - Ramhit",
+      "PM1397 - Mahendra Kumar",
+      "PM1584 - Radheshyam Prasad"
+    ]
+  },
+  "UP_Noida": {
+    "Branch Person": [
+      "PM1694 - Neeraj Kumar",
+      "PM1271 - Hemant Gupta",
+      "PM686 - Mahender Singh",
+      "PM1445 - Neeraj Kumar",
+      "PM1789 - Naveen",
+      "PM763 - Nicky Kumar",
+      "PM1741 - Manish Kumar",
+      "PM1587 - Chintu"
+    ],
+    "Engineer": [
+      "PM1345 - Arun Kumar Sharma",
+      "PM1351 - Sonu Kumar",
+      "PM1343 - Abdul",
+      "PM1344 - Apoorv Tyagi",
+      "PM1352 - Sonu",
+      "PM111 - Mangesh Dataram Sharma",
+      "PM1553 - Deepak Kumar Chaubey",
+      "PM1347 - Naseem Ahamad",
+      "PM358 - Hirdesh Kumar Sharma",
+      "PM616 - Ankit Saini",
+      "PM1348 - Ravi Kumar",
+      "PM1346 - Lalaram"
+    ],
+    "TRC Person": [
+      "PM1156 - Sanjeet Kumar",
+      "PM1349 - Rohan Kumar"
+    ]
+  },
+  "WB_Kolkata": {
+    "Branch Person": [
+      "PM1616 - Bachhan Kumar Giri",
+      "PM1644 - Atanu Pramanik",
+      "PM199 - Asit Chandra",
+      "PM1632 - Sohan paul chowdhury",
+      "PM1685 - Bivash Roy",
+      "PM582 - Sushmita Roy",
+      "PM1207 - Prakash Shaw",
+      "PM511 - Jyotsna Sett",
+      "PM1299 - Binod Prasad Shaw",
+      "TMP045 - MD BELAL"
+    ],
+    "Engineer": [
+      "PM1511 - Arnab Dey",
+      "PM1325 - Shambhu Giri",
+      "PM1703 - Indradev Prasad Yadav",
+      "PM1295 - Ajoy Santra",
+      "PM1323 - Santanu Bhandary",
+      "PM1303 - Chinmoy Bagdi",
+      "PM1311 - Jagannath Koley",
+      "PM1315 - Nipendra Nath Roy",
+      "PM1329 - SOMENATH BOSE",
+      "PM955 - Md.Hamidul Islam",
+      "PM1310 - Gopal Kar",
+      "PM1301 - Chandan Kumar Yadav",
+      "PM484 - Sanjit Biswas",
+      "PM1300 - Biplab Byadh",
+      "PM1318 - Pijus Chakrabarty",
+      "PM1670 - UJJWAL JANA",
+      "PM1308 - Farukh Khan Mondal"
+    ],
+    "TRC Person": [
+      "PM1324 - Santu Ghosh",
+      "PM467 - Saumen Seth"
+    ]
+  }
+};
+
+
+/* --- STATE --- */
+let STORED_ENTRIES = [];
+let activeUser = null;
+let activeTab = "ALL";
+let currentDirection = "in";
+let filterDateRange = "all";
+let searchKeyword = "";
+let currentUploadedFileName = "";
+let currentUploadedFileBase64 = "";
+let currentUploadedFileMime = "";
+let editingId = null; // set when the drawer is editing an existing record
+let currentPage = 1;
+let pageSize = 25;
+let sortColumn = 'date';
+let sortDir = 'desc';
+let syncState = 'idle'; // idle | busy | ok | error
+let lastSyncedAt = null;
+let searchDebounceTimer = null;
+let confirmActionFn = null;
+
+// Custom Date Filter States
+let customStartDate = "";
+let customEndDate = "";
+
+const $ = (id) => document.getElementById(id);
+const formatINR = (n) => "₹" + (Number(n) || 0).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const getISO = () => new Date().toISOString().slice(0, 10);
+const PENDING_QUEUE_KEY = 'petty_cash_pending_queue_v1';
+const LOCAL_ENTRIES_KEY = 'petty_cash_records_v2';
+
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/* --- TOASTS --- */
+function showToast(message, type) {
+  const stack = $('toastStack');
+  const el = document.createElement('div');
+  el.className = 'toast' + (type ? ' ' + type : '');
+  el.innerHTML = `<span>${escapeHtml(message)}</span><button aria-label="Dismiss">✕</button>`;
+  el.querySelector('button').onclick = () => el.remove();
+  stack.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 6000);
+}
+
+/* --- CONFIRM DIALOG (replaces window.confirm) --- */
+function askConfirm(title, body, onConfirm, actionLabel) {
+  $('confirmTitle').textContent = title;
+  $('confirmBody').textContent = body;
+  const btn = $('confirmActionBtn');
+  btn.textContent = actionLabel || 'Delete';
+  confirmActionFn = onConfirm;
+  $('confirmModal').classList.add('open');
+}
+function closeConfirm() { $('confirmModal').classList.remove('open'); confirmActionFn = null; }
+$('confirmActionBtn').addEventListener('click', () => {
+  const fn = confirmActionFn;
+  closeConfirm();
+  if (fn) fn();
+});
+
+/* --- INITIALIZATION & AUTH CHECK --- */
+window.addEventListener('DOMContentLoaded', () => {
+  const session = sessionStorage.getItem('activeUser');
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  try {
+    activeUser = JSON.parse(session);
+  } catch (e) { window.location.href = 'index.html'; return; }
+
+  if (activeUser.loginAt && Date.now() - activeUser.loginAt > SESSION_MAX_AGE_MS) {
+    sessionStorage.removeItem('activeUser');
+    window.location.href = 'index.html';
+    return;
+  }
+
+  activeTab = activeUser.role === 'admin' ? 'ALL' : activeUser.branch;
+  $('activeUserLabel').innerText = activeUser.role === 'admin' ? 'HO Admin' : `${activeUser.branch} Branch`;
+
+  checkConfigBanner();
+  fetchBackendData();
+  setInterval(() => { flushPendingQueue(true); }, AUTO_SYNC_INTERVAL_MS);
+  setInterval(() => {
+    if (activeUser.loginAt && Date.now() - activeUser.loginAt > SESSION_MAX_AGE_MS) { logout(); }
+  }, 60000);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeDrawer(); $('detailModal').classList.remove('open'); closeConfirm(); }
+  });
+});
+
+function checkConfigBanner() {
+  if (!isConfigured(API_ENDPOINTS.GET_RECORDS)) {
+    const banner = document.createElement('div');
+    banner.id = 'configBannerFixed';
+    banner.className = 'config-banner';
+    banner.style.margin = '16px clamp(16px,4vw,40px) 0';
+    banner.innerHTML = `<span>⚠ <b>Not connected to Power Automate.</b> Running in local-only demo mode — data is stored in this browser only and will not sync across devices. Paste your flow URLs into <code>API_ENDPOINTS</code> to go live.</span>`;
+    document.querySelector('main').before(banner);
+  }
+}
+
+function logout() {
+  sessionStorage.removeItem('activeUser');
+  window.location.href = 'index.html';
+}
+
+/* --- NETWORKING HELPERS --- */
+async function fetchWithTimeout(url, options, timeoutMs) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs || REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function apiRequest(url, options, retries) {
+  const headers = { 'Content-Type': 'application/json', ...(API_KEY ? { 'X-API-Key': API_KEY } : {}), ...(options && options.headers) };
+  let attempt = 0;
+  const maxAttempts = (retries === undefined ? 2 : retries) + 1;
+  let lastErr;
+  while (attempt < maxAttempts) {
+    try {
+      const res = await fetchWithTimeout(url, { ...options, headers }, REQUEST_TIMEOUT_MS);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return res;
+    } catch (err) {
+      lastErr = err;
+      attempt++;
+      if (attempt < maxAttempts) await new Promise(r => setTimeout(r, 600 * attempt));
+    }
+  }
+  throw lastErr;
+}
+
+function setSyncState(state, label) {
+  syncState = state;
+  const pill = $('syncPill');
+  pill.classList.remove('ok', 'error', 'busy');
+  if (state === 'ok') pill.classList.add('ok');
+  else if (state === 'error') pill.classList.add('error');
+  else if (state === 'busy') pill.classList.add('busy');
+  $('syncLabel').textContent = label;
+  updatePendingBadge();
+}
+
+function updatePendingBadge() {
+  const queue = getPendingQueue();
+  const badge = $('pendingBadge');
+  if (queue.length > 0) {
+    badge.style.display = 'inline-block';
+    badge.textContent = queue.length;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+function getPendingQueue() {
+  try { return JSON.parse(localStorage.getItem(PENDING_QUEUE_KEY)) || []; } catch (e) { return []; }
+}
+function setPendingQueue(q) { localStorage.setItem(PENDING_QUEUE_KEY, JSON.stringify(q)); updatePendingBadge(); }
+function queueOperation(op) {
+  const q = getPendingQueue();
+  q.push(op);
+  setPendingQueue(q);
+}
+
+/* --- BACKEND DATA FETCHING --- */
+async function fetchBackendData() {
+  if (!isConfigured(API_ENDPOINTS.GET_RECORDS)) {
+    STORED_ENTRIES = JSON.parse(localStorage.getItem(LOCAL_ENTRIES_KEY)) || [];
+    setSyncState('error', 'Local mode — not connected');
+    renderApp();
+    return;
+  }
+
+  setSyncState('busy', 'Loading…');
+  $('mainApp').innerHTML = "<div style='text-align:center; padding: 40px; color:var(--text-secondary);'>Loading data from cloud…</div>";
+  try {
+    const res = await apiRequest(API_ENDPOINTS.GET_RECORDS, { method: 'GET' }, 1);
+    const data = await res.json();
+    STORED_ENTRIES = Array.isArray(data) ? data : (data.value || []);
+    localStorage.setItem(LOCAL_ENTRIES_KEY, JSON.stringify(STORED_ENTRIES));
+    lastSyncedAt = new Date();
+    setSyncState('ok', 'Synced ' + lastSyncedAt.toLocaleTimeString());
+    flushPendingQueue(false);
+  } catch (error) {
+    console.warn("API Error. Loading local data fallback.", error);
+    STORED_ENTRIES = JSON.parse(localStorage.getItem(LOCAL_ENTRIES_KEY)) || [];
+    setSyncState('error', 'Offline — showing cached data');
+    showToast('Could not reach the backend. Showing locally cached data.', 'error');
+  }
+  renderApp();
+}
+
+async function manualSync() {
+  if (syncState === 'busy') return;
+  await fetchBackendData();
+}
+
+/* Attempts to push any queued add/update/delete operations to the backend. */
+async function flushPendingQueue(silent) {
+  if (!isConfigured(API_ENDPOINTS.ADD_RECORD)) return;
+  let queue = getPendingQueue();
+  if (queue.length === 0) return;
+
+  setSyncState('busy', 'Syncing ' + queue.length + ' pending…');
+  const remaining = [];
+  for (const op of queue) {
+    try {
+      if (op.type === 'add') {
+        await apiRequest(API_ENDPOINTS.ADD_RECORD, { method: 'POST', body: JSON.stringify(op.payload) }, 1);
+      } else if (op.type === 'update') {
+        await apiRequest(API_ENDPOINTS.UPDATE_RECORD, { method: 'POST', body: JSON.stringify(op.payload) }, 1);
+      } else if (op.type === 'delete') {
+        await apiRequest(API_ENDPOINTS.DELETE_RECORD, { method: 'POST', body: JSON.stringify({ id: op.payload.id }) }, 1);
+      }
+    } catch (err) {
+      remaining.push(op);
+    }
+  }
+  setPendingQueue(remaining);
+  if (remaining.length === 0) {
+    setSyncState('ok', 'Synced ' + new Date().toLocaleTimeString());
+    if (!silent) showToast('All pending changes synced.', 'ok');
+  } else {
+    setSyncState('error', remaining.length + ' pending changes');
+    if (!silent) showToast(remaining.length + ' change(s) still could not sync.', 'warn');
+  }
+}
+
+/* --- UI FUNCTIONS --- */
+function toggleAccordion(id) {
+  const body = $(id);
+  const isHidden = body.style.display === 'none';
+  body.style.display = isHidden ? 'block' : 'none';
+  $(id + '-arrow').textContent = isHidden ? '▾' : '▸';
+}
+
+function previewUploadedDoc(input) {
+  currentUploadedFileBase64 = "";
+  currentUploadedFileMime = "";
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    currentUploadedFileName = file.name;
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      showToast('File is larger than 3MB — only the filename will be saved, not the file itself.', 'warn');
+      $('docPreviewName').textContent = 'Attached (name only, too large to upload): ' + currentUploadedFileName;
+      $('docPreviewName').style.display = 'block';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      currentUploadedFileBase64 = String(reader.result).split(',')[1] || '';
+      currentUploadedFileMime = file.type || 'application/octet-stream';
+      $('docPreviewName').textContent = 'Attached File: ' + currentUploadedFileName;
+      $('docPreviewName').style.display = 'block';
+    };
+    reader.onerror = () => { showToast('Could not read the selected file.', 'error'); };
+    reader.readAsDataURL(file);
+  } else {
+    currentUploadedFileName = "";
+    $('docPreviewName').style.display = 'none';
+  }
+}
+
+function setEntryDirection(dir) {
+  currentDirection = dir;
+  $('btnInflow').classList.toggle('active', dir === 'in');
+  $('btnOutflow').classList.toggle('active', dir === 'out');
+
+  const isExpense = (dir === 'out');
+  document.querySelectorAll('.expense-only-block').forEach(el => { el.style.display = isExpense ? 'block' : 'none'; });
+  $('groupExpenseType').style.display = isExpense ? 'block' : 'none';
+  $('groupCategory').style.gridColumn = isExpense ? 'span 1' : 'span 2';
+  $('fieldInflowUTR').style.display = isExpense ? 'none' : 'block';
+  $('fieldOutflowPerson').style.display = isExpense ? 'block' : 'none';
+
+  $('lblCategoryTitle').textContent = isExpense ? 'Expense Category *' : 'Credit Source / Category *';
+  $('lblAmountTitle').textContent = isExpense ? 'Expense Amount (₹) *' : 'Received Amount (₹) *';
+
+  if (!isExpense) {
+    $('fExpenseType').innerHTML = `<option value="Credit Received">Credit Received</option>`;
+    $('fCategory').innerHTML = LOOKUP_CREDIT_TYPES["Credit Received"].map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  } else {
+    $('fExpenseType').innerHTML = Object.keys(LOOKUP_EXPENSE_TYPES).map(k => `<option value="${escapeHtml(k)}">${escapeHtml(k)}</option>`).join('');
+    onExpenseTypeChange();
+  }
+}
+
+function onExpenseTypeChange() {
+  const expType = $('fExpenseType').value;
+  const cats = LOOKUP_EXPENSE_TYPES[expType] || [];
+  $('fCategory').innerHTML = cats.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+}
+
+function onExpenseGroupChange() {
+  const group = $('fExpenseGroup').value;
+  const branchCode = $('fBranch').value;
+  const selectCtrl = $('fEngineerSelect');
+  const inputCtrl = $('fEngineerInput');
+  const labelCtrl = $('lblEmployee');
+  const freeEntryGroups = ["Sales Person", "Direct Vendor", "3rd Party"];
+
+  if (freeEntryGroups.includes(group)) {
+    selectCtrl.style.display = 'none';
+    inputCtrl.style.display = 'block';
+    inputCtrl.placeholder = `Enter ${group} Name / Company`;
+    labelCtrl.textContent = `${group} Name`;
+  } else {
+    inputCtrl.style.display = 'none';
+    selectCtrl.style.display = 'block';
+    labelCtrl.textContent = (group === "Branch Person" || group === "Branch Manager") ? "Branch Person" : "Employee Name";
+
+    // Dynamically pull from BRANCH_STAFF_MAP based on selected branch and group
+    let optionsHtml = `<option value="">— Select Employee —</option>`;
+    
+    if (group && branchCode && BRANCH_STAFF_MAP[branchCode] && BRANCH_STAFF_MAP[branchCode][group]) {
+      const staffList = BRANCH_STAFF_MAP[branchCode][group];
+      optionsHtml += staffList.map(name => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+    } else if (group) {
+      optionsHtml = `<option value="">— No staff mapped for this role —</option>`;
+    }
+    
+    $('fEngineerSelect').innerHTML = optionsHtml;
+    $('fEngineerSelect').disabled = false;
+  }
+}
+
+function onDrawerBranchChange() { onExpenseGroupChange(); }
+
+function openDrawer(defaultBranch) {
+  editingId = null;
+  $('drawerTitle').textContent = 'New Cash Transaction';
+  $('saveEntryBtn').textContent = 'Save Record';
+  $('btnInflow').disabled = false; $('btnOutflow').disabled = false;
+  $('formError').style.display = 'none';
+  $('fBranch').innerHTML = BRANCH_CONFIG.map(b => `<option value="${b.code}">${escapeHtml(b.name)}</option>`).join('');
+  $('fBranch').value = defaultBranch;
+  $('fBranch').disabled = (activeUser.role !== 'admin');
+  $('fDate').value = getISO();
+
+  setEntryDirection('in');
+
+  const fields = ['fAmount','fUTR','fPerson','fDivision','fExpenseGroup','fEngineerInput','fEngineerSelect','fBizCategory','fCustomerName','fVoucher','fTicket','fUid','fAtmSiteId','fSiteAddress','fInOutMaterial','fMaterialDetails','fFromLoc','fToLoc','fDistancePlace','fTransporterCo','fVehicleNo','fTransporterContact','fInvoiceNo','fInvoiceDate','fVendorGstin','fLrPodNo','fHOApproval','fRemark','fDocUpload'];
+  fields.forEach(f => { if($(f)) $(f).value = ''; });
+  currentUploadedFileName = "";
+  currentUploadedFileBase64 = "";
+  currentUploadedFileMime = "";
+  $('docPreviewName').style.display = 'none';
+
+  onExpenseGroupChange();
+  $('entryDrawer').classList.add('open');
+  setTimeout(() => $('fDate').focus(), 50);
+}
+
+function editEntry(id) {
+  const item = STORED_ENTRIES.find(e => e.id === id);
+  if (!item) { showToast('Record not found.', 'error'); return; }
+
+  editingId = id;
+  $('drawerTitle').textContent = 'Edit Cash Transaction';
+  $('saveEntryBtn').textContent = 'Update Record';
+  $('formError').style.display = 'none';
+
+  $('fBranch').innerHTML = BRANCH_CONFIG.map(b => `<option value="${b.code}">${escapeHtml(b.name)}</option>`).join('');
+  $('fBranch').value = item.branch;
+  $('fBranch').disabled = (activeUser.role !== 'admin');
+  $('fDate').value = item.date;
+
+  setEntryDirection(item.direction);
+  // Direction shouldn't change on edit (it changes the meaning of most fields) — lock it.
+  $('btnInflow').disabled = true; $('btnOutflow').disabled = true;
+
+  currentUploadedFileName = item.docImageName || '';
+  currentUploadedFileBase64 = item.docImageBase64 || '';
+  currentUploadedFileMime = item.docImageMime || '';
+  if (currentUploadedFileName) {
+    $('docPreviewName').textContent = 'Existing attachment: ' + currentUploadedFileName + ' (choose a new file to replace)';
+    $('docPreviewName').style.display = 'block';
+  } else {
+    $('docPreviewName').style.display = 'none';
+  }
+  $('fDocUpload').value = '';
+
+  if (item.direction === 'in') {
+    $('fCategory').value = item.category || '';
+    $('fAmount').value = item.receivedAmount || '';
+    $('fUTR').value = item.receivedUTR || '';
+  } else {
+    $('fExpenseType').value = item.expenseType || '';
+    onExpenseTypeChange();
+    $('fCategory').value = item.category || '';
+    $('fAmount').value = item.expenseAmount || '';
+    $('fPerson').value = item.person || '';
+    $('fDivision').value = item.division || '';
+    $('fBizCategory').value = item.bizCategory || '';
+    $('fExpenseGroup').value = item.expenseGroup || '';
+    onExpenseGroupChange();
+    if (["Sales Person","Direct Vendor","3rd Party"].includes(item.expenseGroup)) {
+      $('fEngineerInput').value = item.engineer || '';
+    } else if ($('fEngineerSelect')) {
+      $('fEngineerSelect').value = item.engineer || '';
+    }
+    $('fCustomerName').value = item.customerName || '';
+    $('fVoucher').value = item.voucher || '';
+    $('fTicket').value = item.ticket || '';
+    $('fUid').value = item.uid || '';
+    $('fAtmSiteId').value = item.atmSiteId || '';
+    $('fSiteAddress').value = item.siteAddress || '';
+    $('fInOutMaterial').value = item.inOutMaterial || '';
+    $('fMaterialDetails').value = item.materialDetails || '';
+    $('fFromLoc').value = item.fromLoc || '';
+    $('fToLoc').value = item.toLoc || '';
+    $('fDistancePlace').value = item.distancePlace || '';
+    $('fTransporterCo').value = item.transporterCo || '';
+    $('fVehicleNo').value = item.vehicleNo || '';
+    $('fTransporterContact').value = item.transporterContact || '';
+    $('fInvoiceNo').value = item.invoiceNo || '';
+    $('fInvoiceDate').value = item.invoiceDate || '';
+    $('fVendorGstin').value = item.vendorGstin || '';
+    $('fLrPodNo').value = item.lrPodNo || '';
+  }
+  $('fHOApproval').value = item.hoApproval || '';
+  $('fRemark').value = item.remark || '';
+
+  $('entryDrawer').classList.add('open');
+}
+
+function closeDrawer() { $('entryDrawer').classList.remove('open'); }
+
+function computeDateMeta(dateStr) {
+  const d = new Date(dateStr);
+  const monthNum = d.getMonth() + 1;
+  const monthName = d.toLocaleString('default', { month: 'short' });
+  return { month: monthName, monthType: LOOKUP_MONTH_TYPES[monthNum] || monthName, year: d.getFullYear(), qtr: 'Q' + Math.ceil(monthNum / 3) };
+}
+
+/* --- ADD / UPDATE RECORD --- */
+async function saveDrawerEntry() {
+  const amount = parseFloat($('fAmount').value);
+  const date = $('fDate').value;
+  const category = $('fCategory').value;
+
+  if (!amount || amount <= 0 || !date || !category) {
+    $('formError').style.display = 'block';
+    return;
+  }
+  $('formError').style.display = 'none';
+
+  const isExpense = (currentDirection === 'out');
+  const dMeta = computeDateMeta(date);
+  const expenseGroup = $('fExpenseGroup').value;
+
+  let employeeNameVal = '';
+  if (isExpense) {
+    employeeNameVal = ["Sales Person", "Direct Vendor", "3rd Party"].includes(expenseGroup) ? $('fEngineerInput').value.trim() : $('fEngineerSelect').value;
+  }
+
+  const isNew = !editingId;
+  const entry = {
+    id: editingId || ('TX' + Date.now()),
+    branch: $('fBranch').value,
+    date,
+    month: dMeta.month,
+    monthType: dMeta.monthType,
+    year: dMeta.year,
+    qtr: dMeta.qtr,
+    direction: currentDirection,
+    expenseType: isExpense ? $('fExpenseType').value : 'Credit Received',
+    category: category,
+    receivedAmount: !isExpense ? amount : 0,
+    expenseAmount: isExpense ? amount : 0,
+    receivedUTR: !isExpense ? $('fUTR').value.trim() : '',
+    division: isExpense ? $('fDivision').value : '',
+    expenseGroup: expenseGroup,
+    engineer: employeeNameVal,
+    bizCategory: isExpense ? $('fBizCategory').value : '',
+    person: isExpense ? $('fPerson').value.trim() : '',
+    customerName: isExpense ? $('fCustomerName').value.trim() : '',
+    voucher: isExpense ? $('fVoucher').value.trim() : '',
+    ticket: isExpense ? $('fTicket').value.trim() : '',
+    uid: isExpense ? $('fUid').value.trim() : '',
+    atmSiteId: isExpense ? $('fAtmSiteId').value.trim() : '',
+    siteAddress: isExpense ? $('fSiteAddress').value.trim() : '',
+    inOutMaterial: isExpense ? $('fInOutMaterial').value : '',
+    materialDetails: isExpense ? $('fMaterialDetails').value.trim() : '',
+    fromLoc: isExpense ? $('fFromLoc').value.trim() : '',
+    toLoc: isExpense ? $('fToLoc').value.trim() : '',
+    distancePlace: isExpense ? $('fDistancePlace').value.trim() : '',
+    transporterCo: isExpense ? $('fTransporterCo').value.trim() : '',
+    vehicleNo: isExpense ? $('fVehicleNo').value.trim() : '',
+    transporterContact: isExpense ? $('fTransporterContact').value.trim() : '',
+    invoiceNo: isExpense ? $('fInvoiceNo').value.trim() : '',
+    invoiceDate: isExpense ? $('fInvoiceDate').value : '',
+    vendorGstin: isExpense ? $('fVendorGstin').value.trim() : '',
+    lrPodNo: isExpense ? $('fLrPodNo').value.trim() : '',
+    hoApproval: $('fHOApproval').value.trim(),
+    remark: $('fRemark').value.trim(),
+    docImageName: currentUploadedFileName || '',
+    docImageBase64: currentUploadedFileBase64 || '',
+    docImageMime: currentUploadedFileMime || ''
+  };
+
+  // Optimistic local update
+  if (isNew) {
+    STORED_ENTRIES.push(entry);
+  } else {
+    const idx = STORED_ENTRIES.findIndex(e => e.id === editingId);
+    if (idx >= 0) STORED_ENTRIES[idx] = entry; else STORED_ENTRIES.push(entry);
+  }
+  localStorage.setItem(LOCAL_ENTRIES_KEY, JSON.stringify(STORED_ENTRIES));
+  closeDrawer();
+  renderApp();
+  showToast(isNew ? 'Record saved.' : 'Record updated.', 'ok');
+
+  const endpoint = isNew ? API_ENDPOINTS.ADD_RECORD : API_ENDPOINTS.UPDATE_RECORD;
+  if (!isConfigured(endpoint)) return; // local-only mode
+
+  try {
+    setSyncState('busy', 'Saving…');
+    await apiRequest(endpoint, { method: 'POST', body: JSON.stringify(entry) }, 1);
+    setSyncState('ok', 'Synced ' + new Date().toLocaleTimeString());
+  } catch (err) {
+    console.error(err);
+    queueOperation({ type: isNew ? 'add' : 'update', payload: entry });
+    setSyncState('error', 'Save queued — will retry');
+    showToast('Could not reach the cloud. This change is queued and will sync automatically.', 'warn');
+  }
+}
+
+async function deleteEntry(id) {
+  askConfirm('Delete this record?', 'This action cannot be undone once synced.', async () => {
+    STORED_ENTRIES = STORED_ENTRIES.filter(e => e.id !== id);
+    localStorage.setItem(LOCAL_ENTRIES_KEY, JSON.stringify(STORED_ENTRIES));
+    renderApp();
+    showToast('Record deleted.', 'ok');
+
+    if (!isConfigured(API_ENDPOINTS.DELETE_RECORD)) return;
+    try {
+      setSyncState('busy', 'Deleting…');
+      await apiRequest(API_ENDPOINTS.DELETE_RECORD, { method: 'POST', body: JSON.stringify({ id }) }, 1);
+      setSyncState('ok', 'Synced ' + new Date().toLocaleTimeString());
+    } catch (e) {
+      console.error("Cloud delete failed", e);
+      queueOperation({ type: 'delete', payload: { id } });
+      setSyncState('error', 'Delete queued — will retry');
+      showToast('Could not reach the cloud. Deletion is queued and will sync automatically.', 'warn');
+    }
+  }, 'Delete');
+}
+
+/* --- EXPORT ENGINES --- */
+const EXCEL_HEADERS = [
+  'Sr No', 'Branch Name', 'Month', 'Month Type', 'Year', 'Qtr',
+  'Division', 'Expense Group', 'Engineer Name', 'Date', 'Expense Type',
+  'Expense Category', 'Voucher No', 'Ticket No', 'UID No', 'ATM ID',
+  'Site ID', 'Customer Name', 'Business Category', 'Site Address',
+  'Material Details', 'Inward / Outward Material', 'From Location',
+  'To Location', 'Distance', 'Place', 'Transporter Vehicle No',
+  'Transporter Company Name ', 'Transporter Contact Name & Number',
+  'Person Name/Paid to Name', 'Invoice No', 'Invoice Date', 'Vendor GSTIN No',
+  'LR / POD Number', 'Approval Taken from Person Name(HO)',
+  'Received Amount UTR No', 'Received Amount', 'Expense Amount',
+  'Actual in Hand', 'Detailed Remark', 'Document Image upload'
+];
+
+function buildExportRows(dataset) {
+  let running = 0;
+  const sorted = dataset.slice().sort((a,b) => a.date.localeCompare(b.date));
+  return sorted.map((e, idx) => {
+    const amt = e.direction === 'in' ? Number(e.receivedAmount || 0) : -Number(e.expenseAmount || 0);
+    running += amt;
+    return [
+      idx + 1, e.branch, e.month, e.monthType, e.year, e.qtr,
+      e.division || '', e.expenseGroup || '', e.engineer || '', e.date,
+      e.expenseType, e.category, e.voucher || '', e.ticket || '', e.uid || '',
+      e.atmSiteId || '', e.atmSiteId || '', e.customerName || '', e.bizCategory || '',
+      e.siteAddress || '', e.materialDetails || '', e.inOutMaterial || '',
+      e.fromLoc || '', e.toLoc || '', e.distancePlace || '', e.distancePlace || '',
+      e.vehicleNo || '', e.transporterCo || '', e.transporterContact || '',
+      e.person || '', e.invoiceNo || '', e.invoiceDate || '', e.vendorGstin || '',
+      e.lrPodNo || '', e.hoApproval || '', e.receivedUTR || '',
+      e.direction === 'in' ? e.receivedAmount : '', e.direction === 'out' ? e.expenseAmount : '',
+      running, e.remark || '', e.docImageName || ''
+    ];
+  });
+}
+
+function exportCSVPayload(filename, dataset) {
+  const rows = [EXCEL_HEADERS.join(',')];
+  buildExportRows(dataset).forEach(line => {
+    rows.push(line.map(val => `"${String(val).replace(/"/g, '""')}"`).join(','));
+  });
+  const blob = new Blob([rows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportExcelPayload(filename, dataset, branchLabel) {
+  if (typeof XLSX === 'undefined') { showToast('Excel export library failed to load. Try CSV export instead.', 'error'); return; }
+  const wb = XLSX.utils.book_new();
+  const rows = [EXCEL_HEADERS, ...buildExportRows(dataset)];
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = EXCEL_HEADERS.map(() => ({ wch: 16 }));
+  XLSX.utils.book_append_sheet(wb, ws, (branchLabel || 'Ledger').slice(0, 30));
+
+  const stats = getStats(dataset);
+  const summaryRows = [
+    ['Petty Cash Summary', ''],
+    ['Generated', new Date().toLocaleString()],
+    ['Scope', branchLabel || 'All Branches'],
+    [''],
+    ['Total Cash Received', stats.credit],
+    ['Total Cash Spent', stats.debit],
+    ['Actual Cash In-Hand', stats.balance],
+    ['Transaction Count', stats.count]
+  ];
+  const wsSummary = XLSX.utils.aoa_to_sheet(summaryRows);
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
+
+  XLSX.writeFile(wb, filename);
+}
+
+function exportMasterCSV() { exportCSVPayload('Master_Petty_Cash_Data_41Cols.csv', getVisibleEntries()); }
+function exportBranchCSV(code) { exportCSVPayload(`${code}_Petty_Cash_41Cols.csv`, STORED_ENTRIES.filter(e => e.branch === code && matchDateFilter(e.date))); }
+function exportMasterExcel() { exportExcelPayload('Master_Petty_Cash_Data.xlsx', getVisibleEntries(), 'All Branches'); }
+function exportBranchExcel(code) {
+  const bObj = BRANCH_CONFIG.find(x => x.code === code);
+  exportExcelPayload(`${code}_Petty_Cash.xlsx`, STORED_ENTRIES.filter(e => e.branch === code && matchDateFilter(e.date)), bObj ? bObj.name : code);
+}
+
+function toggleMenu(id) {
+  document.querySelectorAll('.dropdown-menu.open').forEach(el => { if (el.id !== id) el.classList.remove('open'); });
+  $(id).classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.dropdown-menu-wrap')) {
+    document.querySelectorAll('.dropdown-menu.open').forEach(el => el.classList.remove('open'));
+  }
+});
+
+/* --- FILTERS & RENDERING --- */
+function matchDateFilter(dateStr) {
+  if (filterDateRange === 'all') return true;
+
+  if (filterDateRange === 'custom') {
+    const s = customStartDate || '0000-00-00';
+    const e = customEndDate || '9999-12-31';
+    return dateStr >= s && dateStr <= e;
+  }
+
+  const itemDate = new Date(dateStr), now = new Date();
+  if (filterDateRange === 'daily') return itemDate.toDateString() === now.toDateString();
+  if (filterDateRange === 'weekly') return Math.abs(now - itemDate) / 86400000 <= 7;
+  if (filterDateRange === 'monthly') return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+  if (filterDateRange === 'yearly') return itemDate.getFullYear() === now.getFullYear();
+  return true;
+}
+
+function getVisibleEntries() {
+  let list = STORED_ENTRIES.filter(e => matchDateFilter(e.date) && (!searchKeyword || JSON.stringify(e).toLowerCase().includes(searchKeyword.toLowerCase())));
+  if (activeUser.role === 'branch') list = list.filter(e => e.branch === activeUser.branch);
+  return list;
+}
+
+function getStats(list) {
+  let credit = 0, debit = 0;
+  list.forEach(i => { credit += Number(i.receivedAmount || 0); debit += Number(i.expenseAmount || 0); });
+  return { credit, debit, balance: credit - debit, count: list.length };
+}
+
+function onSearchInput(value) {
+  clearTimeout(searchDebounceTimer);
+  searchDebounceTimer = setTimeout(() => { searchKeyword = value; currentPage = 1; bootstrapApp(); }, 300);
+}
+
+// Generate the reusable Date Filter Dropdown with Custom pickers
+function renderDateFilterUI() {
+  return `
+    <div style="display:flex; gap:8px; align-items:center;">
+      <select class="select-ctrl" onchange="filterDateRange=this.value; currentPage=1; bootstrapApp();">
+        <option value="all" ${filterDateRange==='all'?'selected':''}>All Time</option>
+        <option value="daily" ${filterDateRange==='daily'?'selected':''}>Today</option>
+        <option value="weekly" ${filterDateRange==='weekly'?'selected':''}>This Week</option>
+        <option value="monthly" ${filterDateRange==='monthly'?'selected':''}>This Month</option>
+        <option value="yearly" ${filterDateRange==='yearly'?'selected':''}>This Year</option>
+        <option value="custom" ${filterDateRange==='custom'?'selected':''}>Custom Range</option>
+      </select>
+
+      <div style="display:${filterDateRange==='custom'?'flex':'none'}; gap:6px; align-items:center;">
+        <input type="date" class="select-ctrl" style="max-width:130px;" value="${escapeHtml(customStartDate)}" onchange="customStartDate=this.value; currentPage=1; bootstrapApp();">
+        <span style="color:var(--text-secondary); font-size:12px;">to</span>
+        <input type="date" class="select-ctrl" style="max-width:130px;" value="${escapeHtml(customEndDate)}" onchange="customEndDate=this.value; currentPage=1; bootstrapApp();">
+      </div>
+    </div>
+  `;
+}
+
+function renderKPIHeader() {
+  const stats = getStats(activeTab === 'ALL' ? getVisibleEntries() : STORED_ENTRIES.filter(e => e.branch === activeTab && matchDateFilter(e.date)));
+  return `
+    <div class="metrics-grid">
+      <div class="kpi-card"><div class="kpi-title">Actual Cash In-Hand</div><div class="kpi-value mono" style="color: ${stats.balance >= 0 ? 'var(--primary)' : 'var(--debit)'}">${formatINR(stats.balance)}</div></div>
+      <div class="kpi-card credit"><div class="kpi-title">Total Cash Received</div><div class="kpi-value mono" style="color: var(--credit);">${formatINR(stats.credit)}</div></div>
+      <div class="kpi-card debit"><div class="kpi-title">Total Cash Spent</div><div class="kpi-value mono" style="color: var(--debit);">${formatINR(stats.debit)}</div></div>
+      <div class="kpi-card"><div class="kpi-title">Transactions Count</div><div class="kpi-value mono">${stats.count}</div></div>
+    </div>
+  `;
+}
+
+function renderAnalytics(items) {
+  const expenseItems = items.filter(e => e.direction === 'out');
+  if (expenseItems.length === 0) return '';
+  const byCategory = {};
+  expenseItems.forEach(e => { const k = e.expenseType || 'Other'; byCategory[k] = (byCategory[k] || 0) + Number(e.expenseAmount || 0); });
+  const entries = Object.entries(byCategory).sort((a,b) => b[1]-a[1]).slice(0, 8);
+  const max = Math.max(...entries.map(e => e[1]), 1);
+  return `
+    <div class="analytics-card">
+      <h3>Expense Breakdown by Type</h3>
+      ${entries.map(([label, val]) => `
+        <div class="bar-row">
+          <div class="bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, (val/max)*100)}%"></div></div>
+          <div class="bar-value mono">${formatINR(val)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+const SORT_ACCESSORS = {
+  date: r => r.date,
+  division: r => r.division || '',
+  expenseType: r => r.expenseType || '',
+  category: r => r.category || '',
+  bizCategory: r => r.bizCategory || '',
+  details: r => (r.customerName || r.engineer || r.remark || ''),
+  in: r => r.direction === 'in' ? Number(r.receivedAmount || 0) : -1,
+  out: r => r.direction === 'out' ? Number(r.expenseAmount || 0) : -1,
+  balance: r => r.runningBalance
+};
+
+function sortRows(rows) {
+  const accessor = SORT_ACCESSORS[sortColumn] || SORT_ACCESSORS.date;
+  const dir = sortDir === 'asc' ? 1 : -1;
+  return rows.slice().sort((a, b) => {
+    const av = accessor(a), bv = accessor(b);
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  });
+}
+
+function setSortColumn(col) {
+  if (sortColumn === col) { sortDir = sortDir === 'asc' ? 'desc' : 'asc'; }
+  else { sortColumn = col; sortDir = col === 'date' ? 'desc' : 'asc'; }
+  currentPage = 1;
+  bootstrapApp();
+}
+
+function sortArrow(col) {
+  if (sortColumn !== col) return '<span class="sort-arrow">↕</span>';
+  return `<span class="sort-arrow">${sortDir === 'asc' ? '↑' : '↓'}</span>`;
+}
+
+function renderBranchLedgerView(branchCode) {
+  const bObj = BRANCH_CONFIG.find(x => x.code === branchCode) || { name: branchCode };
+  const items = getVisibleEntries().filter(e => e.branch === branchCode).sort((a,b) => a.date.localeCompare(b.date));
+  let running = 0;
+  const withBalance = items.map(item => { running += item.direction === 'in' ? Number(item.receivedAmount||0) : -Number(item.expenseAmount||0); return { ...item, runningBalance: running }; });
+  const processedRows = sortRows(withBalance);
+
+  const totalPages = Math.max(1, Math.ceil(processedRows.length / pageSize));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const pageStart = (currentPage - 1) * pageSize;
+  const pageRows = processedRows.slice(pageStart, pageStart + pageSize);
+
+  const pendingIds = new Set(getPendingQueue().filter(o => o.payload && o.payload.id).map(o => o.payload.id));
+
+  return `
+    <div class="toolbar">
+      <div class="toolbar-left">
+        ${activeUser.role === 'admin' ? `<button class="btn sm secondary" onclick="switchTab('ALL')">← Back to Overview</button>` : ''}
+        <h2 style="font-size:18px;">${escapeHtml(bObj.name)} Ledger</h2>
+      </div>
+      <div class="toolbar-right">
+        <input type="text" class="input-search" id="searchInput" placeholder="Search data..." value="${escapeHtml(searchKeyword)}" oninput="onSearchInput(this.value)">
+        ${renderDateFilterUI()}
+        <div class="dropdown-menu-wrap">
+          <button class="btn secondary" onclick="toggleMenu('exportMenuBranch')">Export ▾</button>
+          <div class="dropdown-menu" id="exportMenuBranch">
+            <button onclick="exportBranchCSV('${branchCode}'); toggleMenu('exportMenuBranch');">📄 CSV (41-col)</button>
+            <button onclick="exportBranchExcel('${branchCode}'); toggleMenu('exportMenuBranch');">📊 Excel (.xlsx)</button>
+            <button onclick="window.print(); toggleMenu('exportMenuBranch');">🖨️ Print Ledger</button>
+          </div>
+        </div>
+        <button class="btn" onclick="openDrawer('${branchCode}')">+ New Entry</button>
+      </div>
+    </div>
+    ${renderAnalytics(items)}
+    <div class="table-container">
+      <table class="ledger-table">
+        <thead>
+          <tr>
+            <th class="sortable ${sortColumn==='date'?'active':''}" onclick="setSortColumn('date')">Date ${sortArrow('date')}</th>
+            <th class="sortable ${sortColumn==='division'?'active':''}" onclick="setSortColumn('division')">Division ${sortArrow('division')}</th>
+            <th class="sortable ${sortColumn==='expenseType'?'active':''}" onclick="setSortColumn('expenseType')">Expense Type ${sortArrow('expenseType')}</th>
+            <th>Expense Category</th>
+            <th>Expense Segment</th>
+            <th class="sortable ${sortColumn==='details'?'active':''}" onclick="setSortColumn('details')">Details ${sortArrow('details')}</th>
+            <th class="sortable ${sortColumn==='in'?'active':''}" style="text-align:right;" onclick="setSortColumn('in')">Amount In ${sortArrow('in')}</th>
+            <th class="sortable ${sortColumn==='out'?'active':''}" style="text-align:right;" onclick="setSortColumn('out')">Amount Out ${sortArrow('out')}</th>
+            <th class="sortable ${sortColumn==='balance'?'active':''}" style="text-align:right;" onclick="setSortColumn('balance')">Balance ${sortArrow('balance')}</th>
+            <th style="text-align:center;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${pageRows.length === 0 ? `
+            <tr><td colspan="10" style="text-align:center; padding: 36px; color: var(--text-muted);">No records found for this period.</td></tr>
+          ` : pageRows.map(row => `
+            <tr>
+              <td class="mono">${escapeHtml(row.date)} ${pendingIds.has(row.id) ? '<span class="badge pending">Pending sync</span>' : ''}</td>
+              <td>${escapeHtml(row.division) || '—'}</td>
+              <td><span class="badge ${row.direction}">${escapeHtml(row.expenseType) || '—'}</span></td>
+              <td>${escapeHtml(row.category) || '—'}</td>
+              <td>${escapeHtml(row.bizCategory) || '—'}</td>
+              <td>${escapeHtml(row.customerName || row.engineer || row.remark) || '—'}</td>
+              <td class="mono" style="text-align:right; color:var(--credit);">${row.direction === 'in' ? formatINR(row.receivedAmount) : ''}</td>
+              <td class="mono" style="text-align:right; color:var(--debit);">${row.direction === 'out' ? formatINR(row.expenseAmount) : ''}</td>
+              <td class="mono" style="text-align:right; font-weight:700;">${formatINR(row.runningBalance)}</td>
+              <td style="text-align:center;">
+                <button class="btn sm secondary" onclick="viewDetailModal('${row.id}')">View</button>
+                <button class="btn sm secondary" onclick="editEntry('${row.id}')">Edit</button>
+                ${activeUser.role === 'admin' ? `<button class="btn sm secondary" style="color:var(--debit); border-color:transparent; font-weight:bold;" onclick="deleteEntry('${row.id}')">✕</button>` : ''}
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+      <div class="pagination-bar">
+        <span>Showing ${processedRows.length === 0 ? 0 : pageStart + 1}–${Math.min(pageStart + pageSize, processedRows.length)} of ${processedRows.length}</span>
+        <div class="pagination-controls">
+          <select class="select-ctrl" style="padding:5px 8px;" onchange="pageSize=parseInt(this.value); currentPage=1; bootstrapApp();">
+            <option value="25" ${pageSize===25?'selected':''}>25 / page</option>
+            <option value="50" ${pageSize===50?'selected':''}>50 / page</option>
+            <option value="100" ${pageSize===100?'selected':''}>100 / page</option>
+          </select>
+          <button class="page-btn" ${currentPage<=1?'disabled':''} onclick="currentPage=1; bootstrapApp();">«</button>
+          <button class="page-btn" ${currentPage<=1?'disabled':''} onclick="currentPage--; bootstrapApp();">‹</button>
+          <span class="page-btn active">${currentPage} / ${totalPages}</span>
+          <button class="page-btn" ${currentPage>=totalPages?'disabled':''} onclick="currentPage++; bootstrapApp();">›</button>
+          <button class="page-btn" ${currentPage>=totalPages?'disabled':''} onclick="currentPage=${totalPages}; bootstrapApp();">»</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderApp() {
+  let viewHtml = `<div class="branch-nav-wrapper">`;
+  if (activeUser.role === 'branch') {
+    viewHtml += `<button class="branch-tab active">${escapeHtml(activeUser.branch)}</button>`;
+  } else {
+    viewHtml += `<button class="branch-tab ${activeTab === 'ALL' ? 'active' : ''}" onclick="switchTab('ALL')">All Branches</button>`;
+    BRANCH_CONFIG.forEach(b => { viewHtml += `<button class="branch-tab ${activeTab === b.code ? 'active' : ''}" onclick="switchTab('${b.code}')">${escapeHtml(b.name)}</button>`; });
+  }
+  viewHtml += `</div>` + renderKPIHeader();
+
+  if (activeTab === 'ALL' && activeUser.role === 'admin') {
+    viewHtml += `
+      <div class="toolbar">
+        <div class="toolbar-left"><h2 style="font-size:18px;">All Branches Summary</h2></div>
+        <div class="toolbar-right">
+          ${renderDateFilterUI()}
+          <div class="dropdown-menu-wrap">
+            <button class="btn secondary" onclick="toggleMenu('exportMenuMaster')">Export Master ▾</button>
+            <div class="dropdown-menu" id="exportMenuMaster">
+              <button onclick="exportMasterCSV(); toggleMenu('exportMenuMaster');">📄 CSV (41-col)</button>
+              <button onclick="exportMasterExcel(); toggleMenu('exportMenuMaster');">📊 Excel (.xlsx)</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="grid-branch-cards">${BRANCH_CONFIG.map(b => {
+      const s = getStats(STORED_ENTRIES.filter(e => e.branch === b.code && matchDateFilter(e.date)));
+      return `<div class="branch-summary-card" onclick="switchTab('${b.code}')"><div class="bsc-code">${escapeHtml(b.code)}</div><div class="bsc-name">${escapeHtml(b.name)}</div><div class="bsc-balance mono ${s.balance < 0 ? 'debit' : ''}">${formatINR(s.balance)}</div><div class="bsc-meta"><span style="color:var(--credit)">▲ ${formatINR(s.credit)}</span><span style="color:var(--debit)">▼ ${formatINR(s.debit)}</span></div></div>`;
+    }).join('')}</div>`;
+  } else {
+    viewHtml += renderBranchLedgerView(activeTab);
+  }
+  $('mainApp').innerHTML = viewHtml;
+}
+
+/* Re-renders while preserving focus/cursor position of the active input (search box etc). */
+function bootstrapApp() {
+  const active = document.activeElement;
+  const activeId = active && active.id;
+  const selStart = active && 'selectionStart' in active ? active.selectionStart : null;
+  const selEnd = active && 'selectionEnd' in active ? active.selectionEnd : null;
+
+  renderApp();
+
+  if (activeId) {
+    const el = $(activeId);
+    if (el) {
+      el.focus();
+      if (selStart !== null && el.setSelectionRange) {
+        try { el.setSelectionRange(selStart, selEnd); } catch (e) { /* ignore */ }
+      }
+    }
+  }
+}
+
+function switchTab(code) { activeTab = code; currentPage = 1; bootstrapApp(); }
+
+function viewDetailModal(id) {
+  const item = STORED_ENTRIES.find(e => e.id === id);
+  if (!item) return;
+  const bObj = BRANCH_CONFIG.find(b => b.code === item.branch);
+
+  let detailsHtml = `
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+      <p><b>Branch Name:</b> ${escapeHtml(bObj ? bObj.name : item.branch)}</p>
+      <p><b>Date:</b> ${escapeHtml(item.date)} (${escapeHtml(item.monthType)}, ${escapeHtml(item.year)}, ${escapeHtml(item.qtr)})</p>
+      <p><b>Movement:</b> <span class="badge ${item.direction}">${item.direction === 'in' ? 'Received (Inflow)' : 'Expense (Outflow)'}</span></p>
+      <p><b>Amount:</b> <span class="mono" style="font-weight:700; color:${item.direction==='in'?'var(--credit)':'var(--debit)'}">${formatINR(item.direction==='in'?item.receivedAmount:item.expenseAmount)}</span></p>
+      <p><b>Expense Type:</b> ${escapeHtml(item.expenseType)}</p>
+      <p><b>Expense Category:</b> ${escapeHtml(item.category)}</p>
+    </div>
+    <hr style="border-color:var(--border-color); margin:12px 0;">
+  `;
+
+  if (item.direction === 'in') {
+    detailsHtml += `
+      <p><b>Received Amount UTR No:</b> ${escapeHtml(item.receivedUTR) || '—'}</p>
+      <p><b>Approval Taken from Person Name :</b> ${escapeHtml(item.hoApproval) || '—'}</p>
+    `;
+  } else {
+    detailsHtml += `
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <p><b>Division:</b> ${escapeHtml(item.division) || '—'}</p>
+        <p><b>Expense Group:</b> ${escapeHtml(item.expenseGroup) || '—'}</p>
+        <p><b>Employee Name / Party:</b> ${escapeHtml(item.engineer) || '—'}</p>
+        <p><b>Expense Segment:</b> ${escapeHtml(item.bizCategory) || '—'}</p>
+        <p><b>Customer Name:</b> ${escapeHtml(item.customerName) || '—'}</p>
+        <p><b>Person Name / Paid to:</b> ${escapeHtml(item.person) || '—'}</p>
+        <p><b>Voucher No:</b> ${escapeHtml(item.voucher) || '—'}</p>
+        <p><b>Ticket No:</b> ${escapeHtml(item.ticket) || '—'}</p>
+        <p><b>UID No:</b> ${escapeHtml(item.uid) || '—'}</p>
+        <p><b>ATM / Site ID:</b> ${escapeHtml(item.atmSiteId) || '—'}</p>
+      </div>
+      <p style="margin-top:6px;"><b>Site Address:</b> ${escapeHtml(item.siteAddress) || '—'}</p>
+      <hr style="border-color:var(--border-color); margin:12px 0;">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <p><b>In/Out Material:</b> ${escapeHtml(item.inOutMaterial) || '—'}</p>
+        <p><b>Material Details:</b> ${escapeHtml(item.materialDetails) || '—'}</p>
+        <p><b>From Location:</b> ${escapeHtml(item.fromLoc) || '—'}</p>
+        <p><b>To Location:</b> ${escapeHtml(item.toLoc) || '—'}</p>
+        <p><b>Distance / Place:</b> ${escapeHtml(item.distancePlace) || '—'}</p>
+        <p><b>Transporter Vehicle:</b> ${escapeHtml(item.vehicleNo) || '—'}</p>
+        <p><b>Transporter Company:</b> ${escapeHtml(item.transporterCo) || '—'}</p>
+        <p><b>Transporter Contact:</b> ${escapeHtml(item.transporterContact) || '—'}</p>
+        <p><b>Invoice No:</b> ${escapeHtml(item.invoiceNo) || '—'}</p>
+        <p><b>Invoice Date:</b> ${escapeHtml(item.invoiceDate) || '—'}</p>
+        <p><b>Vendor GSTIN No:</b> ${escapeHtml(item.vendorGstin) || '—'}</p>
+        <p><b>LR / POD Number:</b> ${escapeHtml(item.lrPodNo) || '—'}</p>
+      </div>
+      <hr style="border-color:var(--border-color); margin:12px 0;">
+      <p><b>Approval from HO:</b> ${escapeHtml(item.hoApproval) || '—'}</p>
+    `;
+  }
+
+  detailsHtml += `
+    <p style="margin-top:6px;"><b>Detailed Remark:</b> ${escapeHtml(item.remark) || '—'}</p>
+    <p><b>Document Image / Attachment:</b> ${item.docImageName ? `<span style="color:var(--primary);">📎 ${escapeHtml(item.docImageName)}</span>${item.docImageBase64 ? ` <a href="data:${escapeHtml(item.docImageMime||'application/octet-stream')};base64,${item.docImageBase64}" download="${escapeHtml(item.docImageName)}" style="color:var(--primary); text-decoration:underline; margin-left:8px;">Download</a>` : ''}` : 'None'}</p>
+  `;
+
+  $('detailModalContent').innerHTML = detailsHtml;
+  $('detailModal').classList.add('open');
+}
+</script>
+</body>
+</html>

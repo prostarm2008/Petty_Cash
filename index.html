@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login - Enterprise Petty Cash</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-main: #0B1315; --bg-surface: #121E20; --bg-card: #18282B;
+    --border-color: #243B3F; --border-focus: #10B981;
+    --primary: #10B981; --primary-hover: #059669;
+    --debit: #F43F5E; --debit-bg: rgba(244, 63, 94, 0.12);
+    --text-primary: #F1F5F9; --text-secondary: #94A3B8; --text-muted: #64748B;
+    --radius-sm: 6px; --radius-lg: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background-color: var(--bg-main); color: var(--text-primary);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .login-card {
+    width: min(400px, 100%); background: var(--bg-surface);
+    border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+    padding: 36px 28px; text-align: center; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4);
+    animation: rise .35s ease;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+  .brand-badge {
+    width: 52px; height: 52px; background: linear-gradient(135deg, #10B981 0%, #047857 100%);
+    border-radius: 10px; display: flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 24px; color: #fff; margin: 0 auto 16px;
+  }
+  .form-group { margin-bottom: 14px; text-align: left; }
+  .form-group label { display: block; font-size: 11.5px; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 5px; font-weight: 700; letter-spacing: .4px; }
+  .form-ctrl {
+    width: 100%; background: var(--bg-card); border: 1px solid var(--border-color);
+    color: var(--text-primary); padding: 9px 12px; border-radius: var(--radius-sm); font-size: 13px; font-family: inherit;
+  }
+  .form-ctrl:focus { border-color: var(--border-focus); outline: none; box-shadow: 0 0 0 3px rgba(16,185,129,.15); }
+  .pwd-wrap { position: relative; }
+  .pwd-wrap .form-ctrl { padding-right: 40px; }
+  .pwd-toggle {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 12px;
+    padding: 4px 6px;
+  }
+  .pwd-toggle:hover { color: var(--text-primary); }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+    background: var(--primary); color: #fff; border: none; padding: 11px;
+    border-radius: var(--radius-sm); font-weight: 600; font-size: 13px; cursor: pointer; margin-top: 8px;
+    transition: background .15s ease, opacity .15s ease;
+  }
+  .btn:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn:disabled { opacity: .65; cursor: not-allowed; }
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.4); border-top-color: #fff;
+    animation: spin .7s linear infinite; display: none;
+  }
+  .btn.loading .spinner { display: inline-block; }
+  .btn.loading .btn-label { display: none; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-banner {
+    display: none; align-items: center; gap: 8px; text-align: left;
+    background: var(--debit-bg); border: 1px solid rgba(244,63,94,.35); color: #FCA5A5;
+    padding: 8px 12px; border-radius: var(--radius-sm); font-size: 12px; margin-bottom: 14px;
+  }
+  .error-banner.show { display: flex; }
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 600;
+    color: var(--text-muted); margin-bottom: 18px; text-transform: uppercase; letter-spacing: .5px;
+  }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+  .status-pill.online .status-dot { background: var(--primary); }
+  .status-pill.offline .status-dot { background: var(--debit); }
+  .demo-box { font-size: 11px; color: var(--text-muted); margin-top: 16px; line-height: 1.5; text-align: left; background: rgba(255,255,255,.02); border: 1px dashed var(--border-color); border-radius: var(--radius-sm); padding: 10px 12px; }
+  .demo-box code { color: var(--text-secondary); background: var(--bg-card); padding: 1px 5px; border-radius: 4px; }
+  footer { margin-top: 18px; font-size: 10.5px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="brand-badge">₹</div>
+  <h2 style="font-size: 20px; margin-bottom: 6px;">Petty Cash Portal</h2>
+  <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">Select access level and enter credentials</p>
+
+  <span class="status-pill" id="authModePill"><span class="status-dot"></span><span id="authModeLabel">Checking auth mode…</span></span>
+
+  <div class="error-banner" id="loginError"><span>⚠</span><span id="loginErrorText">Invalid credentials.</span></div>
+
+  <form id="loginForm" autocomplete="off">
+    <div class="form-group">
+      <label for="loginRole">Portal Role</label>
+      <select class="form-ctrl" id="loginRole" onchange="toggleLoginBranch()">
+        <option value="admin">Head Office (HO Admin)</option>
+        <option value="branch">Branch User</option>
+      </select>
+    </div>
+
+    <div class="form-group" id="loginBranchGroup" style="display:none;">
+      <label for="loginBranch">Assigned Branch</label>
+      <select class="form-ctrl" id="loginBranch"></select>
+    </div>
+
+    <div class="form-group">
+      <label for="loginUsername" id="lblUsername" style="display:none;">Username</label>
+      <input type="text" class="form-ctrl" id="loginUsername" placeholder="Username" style="display:none; margin-bottom:10px;" autocomplete="username">
+      <label for="loginPassword">Access Key / Password</label>
+      <div class="pwd-wrap">
+        <input type="password" class="form-ctrl" id="loginPassword" placeholder="Enter password" autocomplete="current-password">
+        <button type="button" class="pwd-toggle" onclick="togglePwd()" id="pwdToggleBtn" aria-label="Show password">Show</button>
+      </div>
+    </div>
+
+    <button class="btn" type="submit" id="loginBtn">
+      <span class="spinner"></span>
+      <span class="btn-label">Sign In</span>
+    </button>
+  </form>
+
+  <div class="demo-box" id="demoBox">
+    Demo Access (used only when no Power Automate login endpoint is configured):<br>
+    • HO Admin: <code>admin</code> / <code>admin</code><br>
+    • Branch User: Select branch / <code>1234</code>
+  </div>
+
+  <footer>Enterprise Petty Cash Ledger · Session auto-expires after 8 hours</footer>
+</div>
+
+<script>
+  /* ============================================================
+     BACKEND CONFIG
+     Paste your Power Automate "When an HTTP request is received"
+     URL below to enable real server-side authentication against
+     a SharePoint / Dataverse Users list. Leave as-is to keep using
+     the local demo credentials below (fine for testing only).
+     See POWER_AUTOMATE_SETUP.md for the exact flow to build.
+  ============================================================ */
+  const AUTH_ENDPOINT = "https://8549b42c711be8948675eefb5cf215.dd.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/17/workflows/a42501404f4440d7a65689627cd9724e/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=vM6EQBRklNJZXvu2-LagkNiTpSfSfy9SfZGPAVt8oFA";
+  const API_KEY = ""; // optional shared secret sent as X-API-Key header, must match the flow's check
+
+  const BRANCH_CONFIG = [
+    {code:"AS_Guwahati", name:"Guwahati"}, {code:"BH_Patna", name:"Patna"},
+    {code:"CG_Chhattisgarh", name:"Chhattisgarh"}, {code:"GJ_Ahmedabad", name:"Ahmedabad"},
+    {code:"JK_Jammu", name:"Jammu"}, {code:"JH_Ranchi", name:"Ranchi"},
+    {code:"KL_Kerala", name:"Kerala"}, {code:"KN_Bangalore", name:"Bangalore"},
+    {code:"MH_Mumbai", name:"Mumbai"}, {code:"MH_Nagpur", name:"Nagpur"},
+    {code:"MH_Pune", name:"Pune"}, {code:"MP_Bhopal", name:"Bhopal"},
+    {code:"OD_Bhubaneswar", name:"Bhubaneswar"}, {code:"PN_Mohali", name:"Mohali"},
+    {code:"RJ_Jaipur", name:"Jaipur"}, {code:"TL_Hyderabad", name:"Hyderabad"},
+    {code:"TN_Chennai", name:"Chennai"}, {code:"TN_Coimbatore", name:"Coimbatore"},
+    {code:"UP_Lucknow", name:"Lucknow"}, {code:"UP_Noida", name:"Noida"},
+    {code:"WB_Kolkata", name:"Kolkata"}
+  ];
+
+  const isAuthConfigured = AUTH_ENDPOINT.indexOf("REPLACE_WITH") !== 0 || AUTH_ENDPOINT.includes("http");
+  const $ = (id) => document.getElementById(id);
+
+  function initAuthModePill() {
+    const pill = $('authModePill');
+    if (isAuthConfigured) {
+      pill.classList.add('online');
+      $('authModeLabel').textContent = 'Server authentication active';
+      $('demoBox').style.display = 'none';
+      $('lblUsername').style.display = 'block';
+      $('loginUsername').style.display = 'block';
+    } else {
+      pill.classList.add('offline');
+      $('authModeLabel').textContent = 'Demo mode (no login endpoint configured)';
+    }
+  }
+
+  function togglePwd() {
+    const input = $('loginPassword');
+    const btn = $('pwdToggleBtn');
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.textContent = showing ? 'Show' : 'Hide';
+    btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+  }
+
+  function toggleLoginBranch() {
+    const isBranch = $('loginRole').value === 'branch';
+    $('loginBranchGroup').style.display = isBranch ? 'block' : 'none';
+    if (isBranch && $('loginBranch').children.length === 0) {
+      $('loginBranch').innerHTML = BRANCH_CONFIG.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
+    }
+  }
+
+  function showLoginError(msg) {
+    $('loginErrorText').textContent = msg;
+    $('loginError').classList.add('show');
+  }
+  function hideLoginError() { $('loginError').classList.remove('show'); }
+
+  function setLoginLoading(isLoading) {
+    $('loginBtn').classList.toggle('loading', isLoading);
+    $('loginBtn').disabled = isLoading;
+  }
+
+  async function fetchWithTimeout(url, options, timeoutMs) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs || 12000);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(id);
+    }
+  }
+
+  function startSession(activeUser) {
+    activeUser.loginAt = Date.now();
+    sessionStorage.setItem('activeUser', JSON.stringify(activeUser));
+    window.location.href = 'dashboard.html';
+  }
+
+  async function handleServerLogin(role, branch, username, pwd) {
+    const res = await fetchWithTimeout(AUTH_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(API_KEY ? { 'X-API-Key': API_KEY } : {}) },
+      body: JSON.stringify({ role, branch, username, password: pwd })
+    }, 12000);
+
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) throw new Error('Invalid username or password.');
+      throw new Error(`Login service error (HTTP ${res.status}).`);
+    }
+    const data = await res.json();
+    if (!data || data.success !== true) {
+      throw new Error(data && data.message ? data.message : 'Invalid credentials.');
+    }
+    return { role: data.role || role, branch: data.branch || branch, username: username || data.username || '', token: data.token || '' };
+  }
+
+  function handleDemoLogin(role, branch, pwd) {
+    if (role === 'admin' && pwd === 'admin') return { role: 'admin', branch: 'ALL' };
+    if (role === 'branch' && pwd === '1234') return { role: 'branch', branch };
+    return null;
+  }
+
+  $('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideLoginError();
+
+    const role = $('loginRole').value;
+    const branch = $('loginBranch').value;
+    const username = $('loginUsername').value.trim();
+    const pwd = $('loginPassword').value.trim();
+
+    if (role === 'branch' && !branch) { showLoginError('Please select your assigned branch.'); return; }
+    if (!pwd) { showLoginError('Please enter your password.'); return; }
+    if (isAuthConfigured && !username) { showLoginError('Please enter your username.'); return; }
+
+    setLoginLoading(true);
+    try {
+      let activeUser;
+      if (isAuthConfigured) {
+        activeUser = await handleServerLogin(role, branch, username, pwd);
+      } else {
+        activeUser = handleDemoLogin(role, branch, pwd);
+        if (!activeUser) throw new Error('Invalid credentials.');
+      }
+      startSession(activeUser);
+    } catch (err) {
+      showLoginError(err.name === 'AbortError' ? 'Login request timed out. Check your connection and try again.' : (err.message || 'Login failed.'));
+      setLoginLoading(false);
+    }
+  });
+
+  // Auto-logout stale sessions (>8h) before showing the form
+  (function clearStaleSession() {
+    try {
+      const s = JSON.parse(sessionStorage.getItem('activeUser') || 'null');
+      if (s && s.loginAt && Date.now() - s.loginAt > 8 * 60 * 60 * 1000) {
+        sessionStorage.removeItem('activeUser');
+      } else if (s) {
+        // already logged in and session still valid — skip straight to dashboard
+        window.location.href = 'dashboard.html';
+      }
+    } catch (e) { /* ignore malformed session */ }
+  })();
+
+  initAuthModePill();
+</script>
+</body>
+</html>
