@@ -376,14 +376,14 @@ const LIVE_ENTRIES_KEY = 'petty_cash_records_v2';
 const LIVE_BRANCHES = [
   {code:"AS_Guwahati", name:"Guwahati", zone:"East"}, {code:"BH_Patna", name:"Patna", zone:"East"},
   {code:"CG_Chhattisgarh", name:"Chhattisgarh", zone:"West"}, {code:"GJ_Ahmedabad", name:"Ahmedabad", zone:"West"},
-  {code:"JK_Jammu", name:"Jammu", zone:"North - 1"}, {code:"JH_Ranchi", name:"Ranchi", zone:"East"},
-  {code:"KL_Kerala", name:"Kerala", zone:"South - 2"}, {code:"KN_Bangalore", name:"Bangalore", zone:"South - 1"},
+  {code:"RJ_Jaipur", name:"Jaipur", zone:"North - 1"}, {code:"UP_Lucknow", name:"Lucknow", zone:"North - 1"},
+  {code:"JK_Jammu", name:"Jammu", zone:"North - 2"}, {code:"JH_Ranchi", name:"Ranchi", zone:"East"},
+  {code:"KL_Kerala", name:"Kerala", zone:"South - 1"}, {code:"KN_Bangalore", name:"Bangalore", zone:"South - 1"},
   {code:"MH_Mumbai", name:"Mumbai", zone:"West"}, {code:"MH_Nagpur", name:"Nagpur", zone:"West"},
   {code:"MH_Pune", name:"Pune", zone:"West"}, {code:"MP_Bhopal", name:"Bhopal", zone:"West"},
   {code:"OD_Bhubaneswar", name:"Bhubaneswar", zone:"East"}, {code:"PN_Mohali", name:"Mohali", zone:"North - 2"},
-  {code:"RJ_Jaipur", name:"Jaipur", zone:"North - 1"}, {code:"TL_Hyderabad", name:"Hyderabad", zone:"South - 3"},
   {code:"TN_Chennai", name:"Chennai", zone:"South - 2"}, {code:"TN_Coimbatore", name:"Coimbatore", zone:"South - 2"},
-  {code:"UP_Lucknow", name:"Lucknow", zone:"North - 1"}, {code:"UP_Noida", name:"Noida", zone:"North - 1"},
+  {code:"TL_Hyderabad", name:"Hyderabad", zone:"South - 3"}, {code:"UP_Noida", name:"Noida", zone:"North - 1"},
   {code:"WB_Kolkata", name:"Kolkata", zone:"East"}
 ];
 const LIVE_TYPE_PALETTE = ['#2f80d2','#00b3a4','#c0567a','#7b5cd6','#0b7f8c','#f28c28','#1e5fa8','#8a6d3b','#5a8f29','#a83279'];
@@ -998,7 +998,9 @@ function renderRail(A){
   const vals={}; let maxv=1;
   BRANCHES.forEach(b=>{vals[b.i]=A.byBranch[b.i]||0;if(vals[b.i]>maxv)maxv=vals[b.i];});
   let h='',lastZone=null;
-  BRANCHES.filter(b=>state.zones.has(b.zi)).forEach(b=>{
+  // Group by zone regardless of the branches' original list order, so each
+  // zone heading appears exactly once with all of its branches beneath it.
+  BRANCHES.filter(b=>state.zones.has(b.zi)).slice().sort((a,b)=>a.zi-b.zi).forEach(b=>{
     if(b.zone!==lastZone){h+=`<div class="zhead">${esc(b.zone)}</div>`;lastZone=b.zone;}
     const on=state.branches.has(b.i);
     h+=`<div class="branch ${on?'on':''}" data-b="${b.i}" role="checkbox" tabindex="0" aria-checked="${on}">
