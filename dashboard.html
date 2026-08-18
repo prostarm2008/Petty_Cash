@@ -1153,6 +1153,8 @@ const BRANCH_STAFF_MAP = {
 /* --- STATE --- */
 let STORED_ENTRIES = [];
 let activeUser = null;
+let ALLOWED_BRANCHES = [];   // branch codes this session may see
+let SCOPED_BRANCHES = [];    // BRANCH_CONFIG entries, filtered to ALLOWED_BRANCHES
 let currentDetailId = null;
 let activeTab = "ALL";
 let currentDirection = "in";
@@ -1226,6 +1228,54 @@ $('confirmActionBtn').addEventListener('click', () => {
   if (fn) fn();
 });
 
+/* --- BRANCH SCOPE HELPERS ---------------------------------------
+   admin    -> every branch
+   regional -> the branch list returned at login (multi-branch RM)
+   branch   -> the single assigned branch
+------------------------------------------------------------------ */
+function resolveAllowedBranches(user) {
+  const all = BRANCH_CONFIG.map(b => b.code);
+  if (!user) return [];
+  if (user.role === 'admin') return all;
+
+  let list = user.branches;
+  if (!Array.isArray(list) || !list.length) {
+    list = String(user.branch || '').split(/[,;|]+/);
+  }
+  const seen = {};
+  const out = [];
+  list.forEach(item => {
+    const code = String(item).trim();
+    if (!code || seen[code] || all.indexOf(code) === -1) return;
+    seen[code] = true;
+    out.push(code);
+  });
+  return out;
+}
+
+function canAccessBranch(code) {
+  return code === 'ALL' || ALLOWED_BRANCHES.indexOf(code) !== -1;
+}
+
+function isMultiBranchUser() { return ALLOWED_BRANCHES.length > 1; }
+function canEditRecords()    { return activeUser && activeUser.role === 'admin'; }
+function canCreateRecords()  { return activeUser && (activeUser.role === 'admin' || activeUser.role === 'branch'); }
+
+function branchName(code) {
+  const b = BRANCH_CONFIG.find(x => x.code === code);
+  return b ? b.name : code;
+}
+
+function scopeLabel() {
+  if (!activeUser) return '';
+  const who = activeUser.username ? activeUser.username : '';
+  if (activeUser.role === 'admin') return 'HO Admin';
+  if (activeUser.role === 'regional') {
+    return `${who ? who + ' · ' : ''}Regional (${ALLOWED_BRANCHES.length} branch${ALLOWED_BRANCHES.length === 1 ? '' : 'es'})`;
+  }
+  return `${activeUser.branch} Branch`;
+}
+
 /* --- INITIALIZATION & AUTH CHECK --- */
 window.addEventListener('DOMContentLoaded', () => {
   const session = sessionStorage.getItem('activeUser');
@@ -1241,12 +1291,25 @@ window.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  activeTab = activeUser.role === 'admin' ? 'ALL' : activeUser.branch;
-  $('activeUserLabel').innerText = activeUser.role === 'admin' ? 'HO Admin' : `${activeUser.branch} Branch`;
+  ALLOWED_BRANCHES = resolveAllowedBranches(activeUser);
+  if (!ALLOWED_BRANCHES.length) {
+    sessionStorage.removeItem('activeUser');
+    alert('No branches are mapped to your login. Please contact Head Office.');
+    window.location.href = 'index.html';
+    return;
+  }
+  SCOPED_BRANCHES = BRANCH_CONFIG.filter(b => ALLOWED_BRANCHES.indexOf(b.code) !== -1);
 
-  // Analytics dashboard is HO Admin-only — branch users don't see the button
+  // Admin and multi-branch regional managers land on the roll-up view;
+  // a single-branch user lands straight in their own ledger.
+  activeTab = isMultiBranchUser() ? 'ALL' : ALLOWED_BRANCHES[0];
+  $('activeUserLabel').innerText = scopeLabel();
+  $('activeUserLabel').title = ALLOWED_BRANCHES.map(branchName).join(', ');
+
+  // Analytics is open to HO Admin and Regional Managers (scoped to their branches)
   const analyticsBtn = $('analyticsBtn');
-  if (analyticsBtn) analyticsBtn.style.display = (activeUser.role === 'admin') ? '' : 'none';
+  const canSeeAnalytics = (activeUser.role === 'admin' || activeUser.role === 'regional');
+  if (analyticsBtn) analyticsBtn.style.display = canSeeAnalytics ? '' : 'none';
 
   checkConfigBanner();
   fetchBackendData();
@@ -1503,14 +1566,16 @@ function onExpenseGroupChange() {
 function onDrawerBranchChange() { onExpenseGroupChange(); }
 
 function openDrawer(defaultBranch) {
+  if (!canCreateRecords()) { showToast('Regional logins are view-only. Branch users post the entries.', 'error'); return; }
+  if (!canAccessBranch(defaultBranch)) { showToast('That branch is outside your access scope.', 'error'); return; }
   editingId = null;
   $('drawerTitle').textContent = 'New Cash Transaction';
   $('saveEntryBtn').textContent = 'Save Record';
   $('btnInflow').disabled = false; $('btnOutflow').disabled = false;
   $('formError').style.display = 'none';
-  $('fBranch').innerHTML = BRANCH_CONFIG.map(b => `<option value="${b.code}">${escapeHtml(b.name)}</option>`).join('');
+  $('fBranch').innerHTML = SCOPED_BRANCHES.map(b => `<option value="${b.code}">${escapeHtml(b.name)}</option>`).join('');
   $('fBranch').value = defaultBranch;
-  $('fBranch').disabled = (activeUser.role !== 'admin');
+  $('fBranch').disabled = (ALLOWED_BRANCHES.length <= 1);
   $('fDate').value = getISO();
 
   setEntryDirection('in');
@@ -1631,6 +1696,12 @@ async function saveDrawerEntry() {
     employeeNameVal = ["Sales Person", "Direct Vendor", "3rd Party"].includes(expenseGroup) ? $('fEngineerInput').value.trim() : $('fEngineerSelect').value;
   }
 
+  if (!editingId && !canCreateRecords()) {
+    $('formError').textContent = 'Regional logins are view-only and cannot post entries.';
+    $('formError').style.display = 'block';
+    return;
+  }
+
   const isNew = !editingId;
   const entry = {
     id: editingId || ('TX' + Date.now()),
@@ -1747,17 +1818,47 @@ function buildExportRows(dataset) {
     const amt = e.direction === 'in' ? Number(e.receivedAmount || 0) : -Number(e.expenseAmount || 0);
     running += amt;
     return [
-      idx + 1, e.branch, e.month, e.monthType, e.year, e.qtr,
-      e.division || '', e.expenseGroup || '', e.engineer || '', e.date,
-      e.expenseType, e.category, e.voucher || '', e.ticket || '', e.uid || '',
-      e.atmSiteId || '', e.atmSiteId || '', e.customerName || '', e.bizCategory || '',
-      e.siteAddress || '', e.materialDetails || '', e.inOutMaterial || '',
-      e.fromLoc || '', e.toLoc || '', e.distancePlace || '', e.distancePlace || '',
-      e.vehicleNo || '', e.transporterCo || '', e.transporterContact || '',
-      e.person || '', e.invoiceNo || '', e.invoiceDate || '', e.vendorGstin || '',
-      e.lrPodNo || '', e.hoApproval || '', e.receivedUTR || '',
-      e.direction === 'in' ? e.receivedAmount : '', e.direction === 'out' ? e.expenseAmount : '',
-      running, e.remark || '', e.docImageName || ''
+      idx + 1, 
+      e.branch, 
+      e.month, 
+      e.monthType, 
+      e.year ? Number(e.year) : null, // Ensures Year is exported as a clean Number
+      e.qtr,
+      e.division || '', 
+      e.expenseGroup || '', 
+      e.engineer || '', 
+      e.date,
+      e.expenseType, 
+      e.category, 
+      e.voucher || '', 
+      e.ticket || '', 
+      e.uid || '',
+      e.atmSiteId || '', 
+      e.atmSiteId || '', 
+      e.customerName || '', 
+      e.bizCategory || '',
+      e.siteAddress || '', 
+      e.materialDetails || '', 
+      e.inOutMaterial || '',
+      e.fromLoc || '', 
+      e.toLoc || '', 
+      e.distancePlace || '', 
+      e.distancePlace || '',
+      e.vehicleNo || '', 
+      e.transporterCo || '', 
+      e.transporterContact || '',
+      e.person || '', 
+      e.invoiceNo || '', 
+      e.invoiceDate || '', 
+      e.vendorGstin || '',
+      e.lrPodNo || '', 
+      e.hoApproval || '', 
+      e.receivedUTR || '',
+      e.direction === 'in' ? Number(e.receivedAmount || 0) : null, // Explicit numeric conversion or null cell
+      e.direction === 'out' ? Number(e.expenseAmount || 0) : null, // Explicit numeric conversion or null cell
+      Number(running.toFixed(2)), // Explicitly cast the running balance calculation as a clean Number type
+      e.remark || '', 
+      e.docImageName || ''
     ];
   });
 }
@@ -1801,10 +1902,22 @@ function exportExcelPayload(filename, dataset, branchLabel) {
   XLSX.writeFile(wb, filename);
 }
 
-function exportMasterCSV() { exportCSVPayload('Master_Petty_Cash_Data_41Cols.csv', getVisibleEntries()); }
-function exportBranchCSV(code) { exportCSVPayload(`${code}_Petty_Cash_41Cols.csv`, STORED_ENTRIES.filter(e => e.branch === code && matchDateFilter(e.date))); }
-function exportMasterExcel() { exportExcelPayload('Master_Petty_Cash_Data.xlsx', getVisibleEntries(), 'All Branches'); }
+function exportMasterCSV() {
+  const tag = activeUser.role === 'admin' ? 'Master' : (activeUser.username || 'Region');
+  exportCSVPayload(`${tag}_Petty_Cash_Data_41Cols.csv`, getVisibleEntries());
+}
+function exportBranchCSV(code) {
+  if (!canAccessBranch(code)) { showToast('That branch is outside your access scope.', 'error'); return; }
+  exportCSVPayload(`${code}_Petty_Cash_41Cols.csv`, STORED_ENTRIES.filter(e => e.branch === code && matchDateFilter(e.date)));
+}
+function exportMasterExcel() {
+  const isAdmin = activeUser.role === 'admin';
+  const tag = isAdmin ? 'Master' : (activeUser.username || 'Region');
+  const scope = isAdmin ? 'All Branches' : ALLOWED_BRANCHES.map(branchName).join(', ');
+  exportExcelPayload(`${tag}_Petty_Cash_Data.xlsx`, getVisibleEntries(), scope);
+}
 function exportBranchExcel(code) {
+  if (!canAccessBranch(code)) { showToast('That branch is outside your access scope.', 'error'); return; }
   const bObj = BRANCH_CONFIG.find(x => x.code === code);
   exportExcelPayload(`${code}_Petty_Cash.xlsx`, STORED_ENTRIES.filter(e => e.branch === code && matchDateFilter(e.date)), bObj ? bObj.name : code);
 }
@@ -1839,7 +1952,7 @@ function matchDateFilter(dateStr) {
 
 function getVisibleEntries() {
   let list = STORED_ENTRIES.filter(e => matchDateFilter(e.date) && (!searchKeyword || JSON.stringify(e).toLowerCase().includes(searchKeyword.toLowerCase())));
-  if (activeUser.role === 'branch') list = list.filter(e => e.branch === activeUser.branch);
+  if (activeUser.role !== 'admin') list = list.filter(e => ALLOWED_BRANCHES.indexOf(e.branch) !== -1);
   return list;
 }
 
@@ -1877,7 +1990,9 @@ function renderDateFilterUI() {
 }
 
 function renderKPIHeader() {
-  const stats = getStats(activeTab === 'ALL' ? getVisibleEntries() : STORED_ENTRIES.filter(e => e.branch === activeTab && matchDateFilter(e.date)));
+  const stats = getStats(activeTab === 'ALL'
+    ? getVisibleEntries()
+    : (canAccessBranch(activeTab) ? STORED_ENTRIES.filter(e => e.branch === activeTab && matchDateFilter(e.date)) : []));
   return `
     <div class="metrics-grid">
       <div class="kpi-card"><div class="kpi-title">Actual Cash In-Hand</div><div class="kpi-value mono" style="color: ${stats.balance >= 0 ? 'var(--primary)' : 'var(--debit)'}">${formatINR(stats.balance)}</div></div>
@@ -1945,6 +2060,10 @@ function sortArrow(col) {
 }
 
 function renderBranchLedgerView(branchCode) {
+  if (!canAccessBranch(branchCode)) {
+    return `<div class="toolbar"><div class="toolbar-left"><h2 style="font-size:18px;">Access denied</h2></div></div>
+            <p style="color:var(--text-secondary); font-size:13px;">${escapeHtml(branchCode)} is not part of your assigned branches.</p>`;
+  }
   const bObj = BRANCH_CONFIG.find(x => x.code === branchCode) || { name: branchCode };
   const items = getVisibleEntries().filter(e => e.branch === branchCode).sort((a,b) => a.date.localeCompare(b.date));
   let running = 0;
@@ -1961,7 +2080,7 @@ function renderBranchLedgerView(branchCode) {
   return `
     <div class="toolbar">
       <div class="toolbar-left">
-        ${activeUser.role === 'admin' ? `<button class="btn sm secondary" onclick="switchTab('ALL')">← Back to Overview</button>` : ''}
+        ${isMultiBranchUser() ? `<button class="btn sm secondary" onclick="switchTab('ALL')">← Back to Overview</button>` : ''}
         <h2 style="font-size:18px;">${escapeHtml(bObj.name)} Ledger</h2>
       </div>
       <div class="toolbar-right">
@@ -1975,7 +2094,7 @@ function renderBranchLedgerView(branchCode) {
             <button onclick="window.print(); toggleMenu('exportMenuBranch');">🖨️ Print Ledger</button>
           </div>
         </div>
-        <button class="btn" onclick="openDrawer('${branchCode}')">+ New Entry</button>
+        ${canCreateRecords() ? `<button class="btn" onclick="openDrawer('${branchCode}')">+ New Entry</button>` : ''}
       </div>
     </div>
     ${renderAnalytics(items)}
@@ -2040,18 +2159,19 @@ function renderBranchLedgerView(branchCode) {
 
 function renderApp() {
   let viewHtml = `<div class="branch-nav-wrapper">`;
-  if (activeUser.role === 'branch') {
-    viewHtml += `<button class="branch-tab active">${escapeHtml(activeUser.branch)}</button>`;
+  if (!isMultiBranchUser()) {
+    viewHtml += `<button class="branch-tab active">${escapeHtml(branchName(ALLOWED_BRANCHES[0]))}</button>`;
   } else {
-    viewHtml += `<button class="branch-tab ${activeTab === 'ALL' ? 'active' : ''}" onclick="switchTab('ALL')">All Branches</button>`;
-    BRANCH_CONFIG.forEach(b => { viewHtml += `<button class="branch-tab ${activeTab === b.code ? 'active' : ''}" onclick="switchTab('${b.code}')">${escapeHtml(b.name)}</button>`; });
+    const allLabel = activeUser.role === 'admin' ? 'All Branches' : 'My Branches';
+    viewHtml += `<button class="branch-tab ${activeTab === 'ALL' ? 'active' : ''}" onclick="switchTab('ALL')">${allLabel}</button>`;
+    SCOPED_BRANCHES.forEach(b => { viewHtml += `<button class="branch-tab ${activeTab === b.code ? 'active' : ''}" onclick="switchTab('${b.code}')">${escapeHtml(b.name)}</button>`; });
   }
   viewHtml += `</div>` + renderKPIHeader();
 
-  if (activeTab === 'ALL' && activeUser.role === 'admin') {
+  if (activeTab === 'ALL' && isMultiBranchUser()) {
     viewHtml += `
       <div class="toolbar">
-        <div class="toolbar-left"><h2 style="font-size:18px;">All Branches Summary</h2></div>
+        <div class="toolbar-left"><h2 style="font-size:18px;">${activeUser.role === 'admin' ? 'All Branches Summary' : 'My Branches Summary'}</h2></div>
         <div class="toolbar-right">
           ${renderDateFilterUI()}
           <div class="dropdown-menu-wrap">
@@ -2063,7 +2183,7 @@ function renderApp() {
           </div>
         </div>
       </div>
-      <div class="grid-branch-cards">${BRANCH_CONFIG.map(b => {
+      <div class="grid-branch-cards">${SCOPED_BRANCHES.map(b => {
       const s = getStats(STORED_ENTRIES.filter(e => e.branch === b.code && matchDateFilter(e.date)));
       return `<div class="branch-summary-card" onclick="switchTab('${b.code}')"><div class="bsc-code">${escapeHtml(b.code)}</div><div class="bsc-name">${escapeHtml(b.name)}</div><div class="bsc-balance mono ${s.balance < 0 ? 'debit' : ''}">${formatINR(s.balance)}</div><div class="bsc-meta"><span style="color:var(--credit)">▲ ${formatINR(s.credit)}</span><span style="color:var(--debit)">▼ ${formatINR(s.debit)}</span></div></div>`;
     }).join('')}</div>`;
@@ -2093,7 +2213,12 @@ function bootstrapApp() {
   }
 }
 
-function switchTab(code) { activeTab = code; currentPage = 1; bootstrapApp(); }
+function switchTab(code) {
+  if (!canAccessBranch(code)) { showToast('That branch is outside your access scope.', 'error'); return; }
+  activeTab = code;
+  currentPage = 1;
+  bootstrapApp();
+}
 
 function viewDetailModal(id) {
   const item = STORED_ENTRIES.find(e => e.id === id);

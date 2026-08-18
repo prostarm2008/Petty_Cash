@@ -64,6 +64,58 @@ body{
 .kpi.total .sub{color:#bcdcf5}
 .kpi.total .ic{color:var(--teal-lt)}
 
+/* date filter bar */
+.datebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:8px 12px;margin-top:8px;box-shadow:var(--shadow)}
+.datebar .dlabel{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700}
+.datebar input[type="date"]{font:inherit;font-size:11.5px;font-weight:600;color:var(--ink);background:var(--tile);
+  border:1px solid var(--line);border-radius:5px;padding:4px 7px;font-variant-numeric:tabular-nums}
+.datebar input[type="date"]:focus-visible{outline:2px solid var(--blue-lt);outline-offset:1px}
+.dsep{color:var(--muted);font-size:11px;font-weight:700}
+.dpresets{display:flex;gap:4px;flex-wrap:wrap;margin-left:auto}
+.dpreset{font:inherit;font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--line);background:var(--tile);color:var(--muted);transition:background .12s,color .12s}
+.dpreset:hover{background:#e6f1f8;color:var(--blue)}
+.dpreset.on{background:linear-gradient(180deg,var(--blue-lt),var(--blue));border-color:var(--blue);color:#fff}
+.dpreset:focus-visible{outline:2px solid var(--navy);outline-offset:1px}
+.drange{font-size:10.5px;font-weight:700;color:var(--blue);font-variant-numeric:tabular-nums}
+
+/* Summary cards */
+.cxocards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.cxocard{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent,var(--blue));
+  border-radius:8px;padding:11px 13px;box-shadow:var(--shadow)}
+.cxocard .lbl{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;display:block}
+.cxocard .val{font-size:22px;font-weight:800;letter-spacing:-.4px;color:var(--navy);
+  font-variant-numeric:tabular-nums;display:block;margin-top:3px;line-height:1.15}
+.cxocard .sub{font-size:10px;color:var(--muted);display:block;margin-top:3px;font-variant-numeric:tabular-nums}
+.cxocard.hero{background:linear-gradient(160deg,#1e5fa8,#0b3f7a);border-color:#0b3f7a;border-left-color:var(--teal-lt)}
+.cxocard.hero .lbl{color:#a9d3f2}
+.cxocard.hero .val{color:#fff}
+.cxocard.hero .sub{color:#bcdcf5}
+.delta{font-weight:800;font-variant-numeric:tabular-nums}
+.delta.up{color:#c0392b}
+.delta.down{color:#0a7d4f}
+.delta.flat{color:var(--muted)}
+@media(max-width:900px){.cxocards{grid-template-columns:repeat(2,1fr)}}
+
+/* Summary pie grid — small multiples, one per branch */
+.pielegend{display:flex;flex-wrap:wrap;gap:6px 14px;padding:0 2px 10px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.pielegend span{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--muted)}
+.pielegend i{width:10px;height:10px;border-radius:2px;flex:0 0 auto}
+.piegrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:14px 10px}
+.piecell{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.piecell svg{width:100%;max-width:124px;height:auto;display:block;
+  filter:drop-shadow(0 1px 2px rgba(11,63,122,.16))}
+.piecell path,.piecell circle{transition:opacity .12s}
+.piecell:hover path,.piecell:hover circle{opacity:.88}
+.piecell figcaption{text-align:center;line-height:1.3}
+.piecell figcaption b{display:block;font-size:11px;font-weight:800;color:var(--navy);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px}
+.piecell figcaption span{display:block;font-size:9.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pieval{font-size:9.5px;font-weight:800;fill:#fff;paint-order:stroke;
+  stroke:rgba(0,0,0,.28);stroke-width:2.2px;stroke-linejoin:round}
+@media(max-width:520px){.piegrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}}
+
 /* nav */
 .navbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;flex-wrap:wrap}
 .navtabs{display:flex;gap:6px}
@@ -178,9 +230,10 @@ tfoot td{font-weight:800;background:#eaf3f9;border-top:2px solid var(--blue);pos
 }
 @media print{
   body{background:#fff}
-  .rail,.dd,.railtools,.tabs,.navtabs{display:none}
+  .rail,.dd,.railtools,.tabs,.navtabs,.dpresets,.backbtn{display:none}
+  .datebar input[type="date"]{border:none;background:none;padding:0}
   .logo{width:150px}
-  .card{break-inside:avoid}
+  .card,.cxocard{break-inside:avoid}
 }
 </style>
 </head>
@@ -206,11 +259,21 @@ tfoot td{font-weight:800;background:#eaf3f9;border-top:2px solid var(--blue);pos
     <span class="datapill" id="dataSourcePill"></span>
   </div>
 
+  <div class="datebar">
+    <span class="dlabel">Date range</span>
+    <input type="date" id="dateFrom" aria-label="From date">
+    <span class="dsep">to</span>
+    <input type="date" id="dateTo" aria-label="To date">
+    <span class="drange" id="dateRangeNote"></span>
+    <span class="dpresets" id="datePresets"></span>
+  </div>
+
   <div class="kpis" id="kpis"></div>
 
   <div class="navbar">
     <div class="navtabs">
-      <button type="button" class="navtab on" data-tab="branch">Branch Analysis</button>
+      <button type="button" class="navtab on" data-tab="cxo">Summary</button>
+      <button type="button" class="navtab" data-tab="branch">Branch Analysis</button>
       <button type="button" class="navtab" data-tab="customer">Customer Analysis</button>
     </div>
     <div class="dd" id="zoneDD">
@@ -237,8 +300,23 @@ tfoot td{font-weight:800;background:#eaf3f9;border-top:2px solid var(--blue);pos
     </div>
 
     <div>
+      <!-- ============ SUMMARY TAB (default view) ============ -->
+      <div class="stack" id="tabCxo">
+        <div class="cxocards" id="cxoCards"></div>
+
+        <div class="card">
+          <h3>Branch-wise Exp by Exp Type <span style="font-weight:500;font-size:10.5px;opacity:.9">one pie per branch · hover any slice for the amount</span></h3>
+          <div class="body"><div id="cxoPies"></div></div>
+        </div>
+
+        <div class="card">
+          <h3>Branch-wise Exp — Exp Type split</h3>
+          <div class="body" style="padding:0"><div class="tblwrap"><table id="cxoTbl"></table></div></div>
+        </div>
+      </div>
+
       <!-- ============ BRANCH TAB ============ -->
-      <div class="stack" id="tabBranch">
+      <div class="stack hide" id="tabBranch">
         <div class="row">
           <div class="card">
             <h3>Exp by Zone</h3>
@@ -347,13 +425,72 @@ tfoot td{font-weight:800;background:#eaf3f9;border-top:2px solid var(--blue);pos
 </div>
 
 <script>
-/* --- ACCESS GUARD: this analytics view is HO Admin-only --- */
-(function guardAdminAccess(){
-  let session;
-  try { session = JSON.parse(sessionStorage.getItem('activeUser') || 'null'); } catch(e) { session = null; }
-  if (!session) { window.location.href = 'index.html'; return; }
-  if (session.role !== 'admin') { window.location.href = 'dashboard.html'; return; }
+/* --- ACCESS GUARD -------------------------------------------------
+   HO Admin sees every branch. A Regional Manager may open this view
+   too, but the dataset is trimmed to the branches on their login
+   before any aggregate is computed — so every KPI, chart and table
+   below is already scoped, with nothing to leak through a filter.
+   Branch users are still sent back to the ledger.
+------------------------------------------------------------------- */
+let SESSION_USER = null;
+(function guardAccess(){
+  try { SESSION_USER = JSON.parse(sessionStorage.getItem('activeUser') || 'null'); } catch(e) { SESSION_USER = null; }
+  if (!SESSION_USER) { window.location.href = 'index.html'; return; }
+  if (SESSION_USER.role !== 'admin' && SESSION_USER.role !== 'regional') { window.location.href = 'dashboard.html'; return; }
 })();
+
+/* Branch codes allowed for this session ("KL_Kerala" style). */
+function sessionBranchCodes(){
+  if (!SESSION_USER || SESSION_USER.role === 'admin') return null; // null = unrestricted
+  let list = SESSION_USER.branches;
+  if (!Array.isArray(list) || !list.length) list = String(SESSION_USER.branch || '').split(/[,;|]+/);
+  return list.map(c => String(c).trim()).filter(Boolean);
+}
+
+/* The two datasets label branches differently — live data uses the
+   plain name ("Guwahati"), the bundled demo set uses the prefixed
+   form ("AS - Guwahati"). Accept both spellings of the same code. */
+function branchLabelVariants(code){
+  const parts = String(code).split('_');
+  const tail = parts.slice(1).join('_');
+  return [code, tail, parts[0] + ' - ' + tail, parts[0] + '-' + tail]
+    .map(v => v.trim().toLowerCase());
+}
+
+function restrictDataToBranches(data, codes){
+  if (!codes || !codes.length) return data;
+  const allowed = new Set();
+  codes.forEach(c => branchLabelVariants(c).forEach(v => allowed.add(v)));
+
+  const branchRemap = {};
+  const branchesOut = [];
+  data.branches.forEach((b, i) => {
+    if (allowed.has(String(b[0]).trim().toLowerCase())) { branchRemap[i] = branchesOut.length; branchesOut.push(b.slice()); }
+  });
+  if (!branchesOut.length) return Object.assign({}, data, { branches: [], rows: [], grand: 0 });
+
+  // drop zones that no longer hold a branch, and reindex
+  const zoneRemap = {};
+  const zonesOut = [];
+  branchesOut.forEach(b => {
+    const zi = b[1];
+    if (zoneRemap[zi] === undefined) { zoneRemap[zi] = zonesOut.length; zonesOut.push(data.zones[zi]); }
+  });
+  branchesOut.forEach(b => { b[1] = zoneRemap[b[1]]; });
+
+  let grand = 0;
+  const rowsOut = [];
+  data.rows.forEach(r => {
+    const bi = branchRemap[r[0]];
+    if (bi === undefined) return;
+    const row = r.slice();
+    row[0] = bi;
+    grand += row[5];
+    rowsOut.push(row);
+  });
+
+  return Object.assign({}, data, { zones: zonesOut, branches: branchesOut, rows: rowsOut, grand });
+}
 /* =====================================================================
    DATA — generated from Data.xlsx, sheet "Data".
    Columns used: Zone, Branch Name, Month, Expense Type, Expense Category,
@@ -389,6 +526,11 @@ const LIVE_BRANCHES = [
 const LIVE_TYPE_PALETTE = ['#2f80d2','#00b3a4','#c0567a','#7b5cd6','#0b7f8c','#f28c28','#1e5fa8','#8a6d3b','#5a8f29','#a83279'];
 const LIVE_MONTH_PALETTE = ['#1e5fa8','#4c93d6','#00b3a4','#5fdccb','#f28c28','#c0567a','#7b5cd6','#0b7f8c','#2f80d2','#8a6d3b','#5a8f29','#a83279'];
 
+/* ---- date helpers (local time, never UTC — avoids day-shift in IST) ---- */
+const ymd = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+const parseYmd = s => { const [y, m, d] = String(s).split('-').map(Number); return new Date(y, m - 1, d); };
+const fmtDay = s => parseYmd(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
 function buildLiveData(){
   let raw;
   try { raw = JSON.parse(localStorage.getItem(LIVE_ENTRIES_KEY)) || []; } catch(e){ raw = []; }
@@ -413,6 +555,16 @@ function buildLiveData(){
   const monthKeys = Array.from(monthMeta.keys()).sort();
   const monthIndex = {};
   const monthsOut = monthKeys.map((k, i) => { monthIndex[k] = i; return [monthMeta.get(k), LIVE_MONTH_PALETTE[i % LIVE_MONTH_PALETTE.length]]; });
+
+  /* date dimension — every expense keeps its own calendar day so the
+     dashboard can filter by date and report Yesterday / MTD figures */
+  const dayKeys = new Set();
+  expenses.forEach(e => {
+    const d = new Date(e.date);
+    if (!isNaN(d)) dayKeys.add(ymd(d));
+  });
+  const datesOut = Array.from(dayKeys).sort();
+  const dateIndex = Object.fromEntries(datesOut.map((d, i) => [d, i]));
 
   const typeIndex = {}, typesOut = [];
   const catIndex = {}, catsOut = [];
@@ -452,19 +604,57 @@ function buildLiveData(){
     if (!(custName in custIndex)) { custIndex[custName] = custsOut.length; custsOut.push(custName); }
     const cui = custIndex[custName];
 
+    const di = dateIndex[ymd(d)];
+    if (di === undefined) return;
+
     const amt = +e.expenseAmount || 0;
-    rowsOut.push([bi, mi, ci, si, cui, amt]);
+    rowsOut.push([bi, mi, ci, si, cui, amt, di]);
     grand += amt;
   });
 
   if (!rowsOut.length) return null;
 
-  return { zones: zoneNames, branches: branchesOut, months: monthsOut, types: typesOut, cats: catsOut, segs: segsOut, custs: custsOut, rows: rowsOut, grand };
+  return { zones: zoneNames, branches: branchesOut, months: monthsOut, types: typesOut, cats: catsOut, segs: segsOut, custs: custsOut, dates: datesOut, rows: rowsOut, grand };
 }
 
 const LIVE_DATA = buildLiveData();
 const IS_LIVE = !!LIVE_DATA;
-const DATA = LIVE_DATA || DEMO_DATA;
+
+/* ============================================================
+   DEMO DATES
+   The bundled demo dataset is aggregated to month level and
+   carries no calendar day. To let the date filter and the Summary
+   Yesterday / MTD cards be exercised without live records, each
+   demo row is given a repeatable day inside its own month.
+   These days are illustrative only — live ledger records always
+   use their real posting date.
+============================================================ */
+const MONTH_NUM = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function addDemoDates(data){
+  const monthStart = data.months.map(([label]) => {
+    const m = String(label).match(/^([A-Za-z]{3})'?(\d{2,4})$/);
+    if(!m) return new Date();
+    const yr = +m[2] < 100 ? 2000 + +m[2] : +m[2];
+    return new Date(yr, MONTH_NUM[m[1].toLowerCase()] ?? 0, 1);
+  });
+  const dayKeys = new Set();
+  const withDates = data.rows.map((r, k) => {
+    const base = monthStart[r[1]] || new Date();
+    const dim = new Date(base.getFullYear(), base.getMonth() + 1, 0).getDate();
+    const day = 1 + ((k * 7 + r[0] * 3 + r[2]) % dim);
+    const key = ymd(new Date(base.getFullYear(), base.getMonth(), day));
+    dayKeys.add(key);
+    return r.concat([key]);
+  });
+  const dates = Array.from(dayKeys).sort();
+  const dateIndex = Object.fromEntries(dates.map((d, i) => [d, i]));
+  return Object.assign({}, data, {
+    dates,
+    rows: withDates.map(r => r.slice(0, 6).concat([dateIndex[r[6]]]))
+  });
+}
+
+const DATA = restrictDataToBranches(LIVE_DATA || addDemoDates(DEMO_DATA), sessionBranchCodes());
 
 const ZONE_COLORS=['#1e5fa8','#00b3a4','#f28c28','#7b5cd6','#c0567a','#2f80d2','#0b7f8c'];
 const SEG_COLORS ={'ATM':'#1e5fa8','NON-ATM':'#00b3a4','BRANCH':'#f28c28'};
@@ -476,7 +666,49 @@ const TYPES    = DATA.types.map(([key,label,short,color],i)=>({i,key,label,short
 const CATS     = DATA.cats.map(([name,ti],i)=>({i,name,ti}));
 const SEGS     = DATA.segs.map((s,i)=>({i,name:s,color:SEG_COLORS[s]||ZONE_COLORS[i%ZONE_COLORS.length]}));
 const CUSTS    = DATA.custs;
+const DATES    = DATA.dates || [];
 const ROWS     = DATA.rows;
+
+/* ---------------------------------------------------------------
+   REPORTING ANCHOR
+   Yesterday and MTD are measured against the calendar, because
+   branches post entries the same day they spend — so the newest
+   record in the ledger is normally today, not yesterday.
+
+   Yesterday means the previous calendar day. If nothing was posted
+   then (weekend, holiday, branch shut), it falls back to the most
+   recent day before today that does have entries, and the card
+   states which date it actually used rather than showing a blank.
+--------------------------------------------------------------- */
+const DATE_MIN = DATES.length ? DATES[0] : null;
+const DATE_MAX = DATES.length ? DATES[DATES.length - 1] : null;
+
+const shiftDays = (s, n) => { const d = parseYmd(s); return ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)); };
+
+const TODAY   = ymd(new Date());
+const monthStartOf = s => { const d = parseYmd(s); return ymd(new Date(d.getFullYear(), d.getMonth(), 1)); };
+/* newest dated day strictly before the given day */
+const lastDayBefore = s => { for(let i=DATES.length-1;i>=0;i--) if(DATES[i] < s) return DATES[i]; return null; };
+
+const CAL_YDAY = shiftDays(TODAY, -1);
+const ANCHOR = {
+  today:  TODAY,
+  day:    null,   /* the day the "Yesterday" card reports on */
+  prev:   null,   /* the working day before that, for the delta  */
+  mStart: monthStartOf(TODAY),
+  mEnd:   TODAY,
+  fellBack: false
+};
+if (DATES.length) {
+  ANCHOR.day = DATES.includes(CAL_YDAY) ? CAL_YDAY : lastDayBefore(TODAY);
+  ANCHOR.fellBack = !!ANCHOR.day && ANCHOR.day !== CAL_YDAY;
+  if (ANCHOR.day) ANCHOR.prev = lastDayBefore(ANCHOR.day);
+}
+
+/* the pickers must reach today even if the ledger has no entry yet */
+const PICK_MIN = DATE_MIN && DATE_MIN < TODAY ? DATE_MIN : TODAY;
+const PICK_MAX = DATE_MAX && DATE_MAX > TODAY ? DATE_MAX : TODAY;
+const clampDate = s => !s ? s : (s < PICK_MIN ? PICK_MIN : (s > PICK_MAX ? PICK_MAX : s));
 
 /* ===================== helpers ===================== */
 const inr  = n => '₹' + Math.round(n).toLocaleString('en-IN');
@@ -513,23 +745,31 @@ function boxWidth(el,min){
 
 /* ===================== state ===================== */
 const state = {
-  tab:'branch',
+  tab:'cxo',
   zones:    new Set(ZONES.map(z=>z.i)),
   branches: new Set(BRANCHES.map(b=>b.i)),
   months:   new Set(MONTHS.map(m=>m.i)),
   types:    new Set(TYPES.map(t=>t.i)),
   segs:     new Set(SEGS.map(s=>s.i)),
   view:'branch', cview:'customer',
-  sort:{col:'total',dir:-1}, catSort:{col:'total',dir:-1}, cSort:{col:'total',dir:-1}
+  dFrom: PICK_MIN, dTo: PICK_MAX, preset:'all',
+  sort:{col:'total',dir:-1}, catSort:{col:'total',dir:-1}, cSort:{col:'total',dir:-1},
+  xSort:{col:'total',dir:-1}
 };
 const activeBranch = b => state.branches.has(b.i) && state.zones.has(b.zi);
+const inDateRange  = di => {
+  if(!DATES.length) return true;
+  const d = DATES[di];
+  if(d === undefined) return true;
+  return (!state.dFrom || d >= state.dFrom) && (!state.dTo || d <= state.dTo);
+};
 
 /* ===================== aggregation (single pass) ===================== */
 function agg(){
   const A={
     total:0, byBranch:{}, byType:{}, typeAll:{}, byCat:{}, byZone:{}, bySeg:{}, byCust:{},
     branchMonthType:{}, segType:{}, catMonth:{}, custMonth:{}, segTypeMonth:{}, fullRows:new Map(),
-    monthTotal:{}
+    monthTotal:{}, branchType:{}, dayTotal:{}
   };
   BRANCHES.forEach(b=>{A.byBranch[b.i]=0;A.branchMonthType[b.i]={};MONTHS.forEach(m=>{A.branchMonthType[b.i][m.i]={};});});
   TYPES.forEach(t=>{A.byType[t.i]=0;A.typeAll[t.i]=0;});
@@ -538,11 +778,14 @@ function agg(){
   SEGS.forEach(s=>{A.bySeg[s.i]=0;A.segType[s.i]={};A.segTypeMonth[s.i]={};});
   MONTHS.forEach(m=>A.monthTotal[m.i]=0);
 
+  BRANCHES.forEach(b=>{A.branchType[b.i]={};TYPES.forEach(t=>{A.branchType[b.i][t.i]=0;});});
+
   for(let k=0;k<ROWS.length;k++){
-    const r=ROWS[k], b=BRANCHES[r[0]], mi=r[1], ci=r[2], si=r[3], cui=r[4], amt=r[5];
+    const r=ROWS[k], b=BRANCHES[r[0]], mi=r[1], ci=r[2], si=r[3], cui=r[4], amt=r[5], di=r[6];
     if(!activeBranch(b)) continue;
     if(!state.months.has(mi)) continue;
     if(!state.segs.has(si)) continue;
+    if(!inDateRange(di)) continue;
     const ti=CATS[ci].ti;
     A.typeAll[ti]+=amt;
     if(!state.types.has(ti)) continue;
@@ -550,6 +793,8 @@ function agg(){
     A.total+=amt;
     A.byBranch[b.i]+=amt; A.byZone[b.zi]+=amt; A.byType[ti]+=amt; A.byCat[ci]+=amt;
     A.bySeg[si]+=amt; A.byCust[cui]=(A.byCust[cui]||0)+amt; A.monthTotal[mi]+=amt;
+    A.branchType[b.i][ti]+=amt;
+    if(di!==undefined) A.dayTotal[di]=(A.dayTotal[di]||0)+amt;
 
     const bmt=A.branchMonthType[b.i][mi]; bmt[ti]=(bmt[ti]||0)+amt;
     A.catMonth[ci][mi]=(A.catMonth[ci][mi]||0)+amt;
@@ -567,6 +812,28 @@ function agg(){
     f.total+=amt; f.m[mi]=(f.m[mi]||0)+amt;
   }
   return A;
+}
+
+/* ---------------------------------------------------------------
+   WINDOW TOTALS
+   Used by the Summary cards. Respects the zone / branch / type /
+   segment selections so a reader can scope to a region, but ignores
+   the date-range filter — Yesterday and MTD define their own
+   windows and would otherwise contradict the filter above them.
+--------------------------------------------------------------- */
+function windowTotal(fromStr, toStr){
+  let sum = 0, n = 0;
+  if(!fromStr || !toStr) return {sum, n};
+  for(let k=0;k<ROWS.length;k++){
+    const r=ROWS[k], b=BRANCHES[r[0]], si=r[3], amt=r[5], di=r[6];
+    if(!activeBranch(b)) continue;
+    if(!state.segs.has(si)) continue;
+    if(!state.types.has(CATS[r[2]].ti)) continue;
+    const d = DATES[di];
+    if(d===undefined || d < fromStr || d > toStr) continue;
+    sum += amt; n++;
+  }
+  return {sum, n};
 }
 
 /* ===================== icons (line style) ===================== */
@@ -847,6 +1114,135 @@ function drawTable(tblId,cols,rows,footCells,sortState,onSort){
 }
 const numTd = v => `<td title="${inr(v)}">${inrS(v)}</td>`;
 
+/* ===================== render: Summary tab ===================== */
+function pieSlice(cx,cy,r,a0,a1){
+  const large=(a1-a0)>Math.PI?1:0;
+  const x0=cx+r*Math.cos(a0), y0=cy+r*Math.sin(a0);
+  const x1=cx+r*Math.cos(a1), y1=cy+r*Math.sin(a1);
+  return `M${cx},${cy} L${x0.toFixed(2)},${y0.toFixed(2)} A${r},${r} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)} Z`;
+}
+
+/* One pie per branch — shared colour scale across every pie, so a
+   slice colour means the same expense type in all of them. */
+function cxoPieGrid(el,A,rows){
+  const types=TYPES.filter(t=>state.types.has(t.i));
+  const data=rows.map(b=>({b,total:A.byBranch[b.i]||0})).filter(d=>d.total>0)
+    .sort((x,y)=>y.total-x.total);
+
+  if(!data.length){el.innerHTML='<p class="note" style="padding:24px">No expenses match the current filters.</p>';return;}
+
+  const legend=`<div class="pielegend">`+types.filter(t=>A.byType[t.i]>0).map(t=>
+    `<span><i style="background:${t.color}"></i>${esc(abbr(t.label))}</span>`).join('')+`</div>`;
+
+  const R=52, S=124, C=S/2;
+  const cells=data.map(d=>{
+    const parts=types.map(t=>({t,v:A.branchType[d.b.i][t.i]||0})).filter(p=>p.v>0)
+      .sort((x,y)=>y.v-x.v);
+    let svg='';
+    if(parts.length===1){
+      const p=parts[0];
+      svg=`<circle cx="${C}" cy="${C}" r="${R}" fill="${p.t.color}">
+        <title>${esc(d.b.code)} · ${esc(p.t.label)}: ${inr(p.v)} (100%)</title></circle>`;
+    } else {
+      let a=-Math.PI/2;
+      parts.forEach(p=>{
+        const sweep=2*Math.PI*(p.v/d.total), a1=a+sweep, share=p.v/d.total*100;
+        svg+=`<path d="${pieSlice(C,C,R,a,a1)}" fill="${p.t.color}" stroke="#fff" stroke-width="1.2">
+          <title>${esc(d.b.code)} · ${esc(p.t.label)}: ${inr(p.v)} (${share.toFixed(1)}%)</title></path>`;
+        if(share>=12){
+          const mid=a+sweep/2, lx=C+R*0.62*Math.cos(mid), ly=C+R*0.62*Math.sin(mid);
+          svg+=`<text class="pieval" x="${lx.toFixed(1)}" y="${(ly+3).toFixed(1)}" text-anchor="middle">${Math.round(share)}%</text>`;
+        }
+        a=a1;
+      });
+    }
+    return `<figure class="piecell">
+      <svg viewBox="0 0 ${S} ${S}" role="img" aria-label="${esc(d.b.code)} expense type split">${svg}</svg>
+      <figcaption>
+        <b title="${esc(d.b.code)} · ${esc(d.b.zone)}">${esc(clip(d.b.code,18))}</b>
+        <span>${inrS(d.total)} · ${parts.length} type${parts.length===1?'':'s'}</span>
+      </figcaption></figure>`;
+  }).join('');
+
+  el.innerHTML=legend+`<div class="piegrid">${cells}</div>`;
+}
+
+function renderCxoTab(A,rows){
+  const types=TYPES.filter(t=>state.types.has(t.i));
+
+  /* --- headline cards --- */
+  const today = windowTotal(ANCHOR.today, ANCHOR.today);
+  const day   = ANCHOR.day  ? windowTotal(ANCHOR.day, ANCHOR.day)   : {sum:0,n:0};
+  const prev  = ANCHOR.prev ? windowTotal(ANCHOR.prev, ANCHOR.prev) : {sum:0,n:0};
+  const mtd   = windowTotal(ANCHOR.mStart, ANCHOR.mEnd);
+
+  const diff = day.sum - prev.sum;
+  const pct  = prev.sum ? (diff/prev.sum*100) : null;
+  const dCls = Math.abs(diff)<1 ? 'flat' : (diff>0?'up':'down');
+  const dTxt = prev.sum
+    ? `<span class="delta ${dCls}">${diff>0?'▲':diff<0?'▼':'–'} ${inrS(Math.abs(diff))}${pct!==null?' ('+Math.abs(pct).toFixed(1)+'%)':''}</span> vs ${fmtDay(ANCHOR.prev)}`
+    : 'No earlier day to compare';
+
+  /* run rate divides by days elapsed this month, so it stays comparable
+     on the 3rd and on the 28th */
+  const mDays = parseYmd(ANCHOR.mEnd).getDate();
+  const runRate = mDays ? mtd.sum/mDays : 0;
+
+  const ydayNote = !ANCHOR.day ? 'No entries before today'
+    : (ANCHOR.fellBack ? `${fmtDay(ANCHOR.day)} · last day with entries` : `${fmtDay(ANCHOR.day)} · ${day.n} entr${day.n===1?'y':'ies'}`);
+
+  const topB = rows.map(b=>({b,v:A.byBranch[b.i]||0})).sort((x,y)=>y.v-x.v)[0];
+
+  document.getElementById('cxoCards').innerHTML = `
+    <div class="cxocard hero">
+      <span class="lbl">Yesterday's Exp</span>
+      <span class="val">${inr(day.sum)}</span>
+      <span class="sub">${ydayNote}</span>
+    </div>
+    <div class="cxocard" style="--accent:#00b3a4">
+      <span class="lbl">Month to Date</span>
+      <span class="val">${inr(mtd.sum)}</span>
+      <span class="sub">${fmtDay(ANCHOR.mStart)} to ${fmtDay(ANCHOR.mEnd)} · ${mtd.n} entries</span>
+    </div>
+    <div class="cxocard" style="--accent:#f28c28">
+      <span class="lbl">Today's Exp</span>
+      <span class="val">${inr(today.sum)}</span>
+      <span class="sub">${fmtDay(ANCHOR.today)} · ${today.n} entr${today.n===1?'y':'ies'} so far</span>
+    </div>
+    <div class="cxocard" style="--accent:#7b5cd6">
+      <span class="lbl">MTD Daily Run Rate</span>
+      <span class="val">${inr(runRate)}</span>
+      <span class="sub">over ${mDays} day${mDays===1?'':'s'} · ${dTxt}</span>
+    </div>`;
+
+  cxoPieGrid(document.getElementById('cxoPies'),A,rows);
+
+  /* --- branch-wise matrix, split by expense type --- */
+  const cols=[{k:'code',l:'Branch',t:'l',w:'14%'},{k:'zone',l:'Zone',t:'l',w:'10%'}]
+    .concat(types.map(t=>({k:'t'+t.i,l:abbr(t.short)})))
+    .concat([{k:'total',l:'Total Exp'},{k:'share',l:'% of Exp'}]);
+
+  const data=rows.map(b=>({b,total:A.byBranch[b.i]||0,vals:types.map(t=>A.branchType[b.i][t.i]||0)}))
+                 .filter(d=>d.total>0);
+  const {col,dir}=state.xSort;
+  data.sort((x,y)=>{
+    if(col==='code') return dir*x.b.code.localeCompare(y.b.code);
+    if(col==='zone') return dir*x.b.zone.localeCompare(y.b.zone);
+    if(col==='total'||col==='share') return dir*(x.total-y.total);
+    const ti=types.findIndex(t=>'t'+t.i===col);
+    return ti<0?0:dir*(x.vals[ti]-y.vals[ti]);
+  });
+
+  drawTable('cxoTbl',cols,
+    data.map(d=>[`<td class="l" title="${esc(d.b.code)}">${esc(d.b.code)}</td>`,
+                 `<td class="l" title="${esc(d.b.zone)}">${esc(d.b.zone)}</td>`]
+      .concat(d.vals.map(numTd))
+      .concat([numTd(d.total),`<td>${A.total?(d.total/A.total*100).toFixed(1):'0.0'}%</td>`])),
+    [`<td class="l">Total (${data.length} branch${data.length===1?'':'es'})</td>`,'<td></td>']
+      .concat(types.map(t=>numTd(A.byType[t.i]))).concat([numTd(A.total),'<td>100.0%</td>']),
+    state.xSort, k=>{state.xSort=state.xSort.col===k?{col:k,dir:-state.xSort.dir}:{col:k,dir:(k==='code'||k==='zone')?1:-1};render();});
+}
+
 /* ===================== render: branch tab ===================== */
 function renderBranchTab(A,rows){
   donut('zoneDonut','zoneLegend',
@@ -1046,16 +1442,79 @@ function toggleIn(set,k){ if(set.has(k)){ if(set.size>1) set.delete(k); } else s
   document.addEventListener('keydown',e=>{if(e.key==='Escape')setOpen(false);});
 });
 
+/* ===================== date filter ===================== */
+/* Every window is measured from the calendar (today), not from the
+   newest ledger entry — entries are posted same-day, so anchoring to
+   the data made "Yesterday" resolve to today. */
+const DATE_PRESETS = [
+  {k:'all',   l:'All dates'},
+  {k:'today', l:'Today'},
+  {k:'yday',  l:'Yesterday'},
+  {k:'d7',    l:'Last 7 days'},
+  {k:'d30',   l:'Last 30 days'},
+  {k:'mtd',   l:'MTD'},
+  {k:'pm',    l:'Prev month'}
+];
+
+function applyPreset(k){
+  state.preset = k;
+  if(!DATES.length){ state.dFrom=null; state.dTo=null; return; }
+  const d = parseYmd(TODAY);
+  switch(k){
+    case 'today': state.dFrom=TODAY; state.dTo=TODAY; break;
+    /* uses the resolved anchor, so a weekend falls back to the last
+       working day instead of selecting an empty date */
+    case 'yday':  state.dFrom=state.dTo=(ANCHOR.day || CAL_YDAY); break;
+    case 'd7':    state.dFrom=clampDate(shiftDays(TODAY,-6));  state.dTo=TODAY; break;
+    case 'd30':   state.dFrom=clampDate(shiftDays(TODAY,-29)); state.dTo=TODAY; break;
+    case 'mtd':   state.dFrom=clampDate(monthStartOf(TODAY));  state.dTo=TODAY; break;
+    case 'pm': {
+      const s=new Date(d.getFullYear(),d.getMonth()-1,1), e=new Date(d.getFullYear(),d.getMonth(),0);
+      state.dFrom=clampDate(ymd(s)); state.dTo=clampDate(ymd(e)); break;
+    }
+    default: state.dFrom=PICK_MIN; state.dTo=PICK_MAX;
+  }
+}
+
+function renderDateBar(A){
+  const from=document.getElementById('dateFrom'), to=document.getElementById('dateTo');
+  from.min=to.min=PICK_MIN; from.max=to.max=PICK_MAX;
+  from.value=state.dFrom||''; to.value=state.dTo||'';
+
+  const days = DATES.filter(d=>(!state.dFrom||d>=state.dFrom)&&(!state.dTo||d<=state.dTo)).length;
+  document.getElementById('dateRangeNote').textContent =
+    DATES.length ? `${days} day${days===1?'':'s'} in range · ${inrS(A.total)}` : 'No dated records';
+
+  document.getElementById('datePresets').innerHTML =
+    DATE_PRESETS.map(p=>`<button type="button" class="dpreset ${state.preset===p.k?'on':''}" data-p="${p.k}">${p.l}</button>`).join('');
+  document.querySelectorAll('.dpreset').forEach(b=>b.onclick=()=>{applyPreset(b.dataset.p);render();});
+}
+
+document.getElementById('dateFrom').onchange=e=>{
+  state.dFrom=e.target.value||PICK_MIN; state.preset='custom';
+  if(state.dTo && state.dFrom>state.dTo) state.dTo=state.dFrom;
+  render();
+};
+document.getElementById('dateTo').onchange=e=>{
+  state.dTo=e.target.value||PICK_MAX; state.preset='custom';
+  if(state.dFrom && state.dTo<state.dFrom) state.dFrom=state.dTo;
+  render();
+};
+
 /* ===================== master render ===================== */
 function render(){
   const A=agg();
   const rows=BRANCHES.filter(activeBranch);
 
   renderKpis(A);
+  renderDateBar(A);
+  document.getElementById('tabCxo').classList.toggle('hide',state.tab!=='cxo');
   document.getElementById('tabBranch').classList.toggle('hide',state.tab!=='branch');
   document.getElementById('tabCustomer').classList.toggle('hide',state.tab!=='customer');
 
-  if(state.tab==='branch') renderBranchTab(A,rows); else renderCustomerTab(A);
+  if(state.tab==='cxo')           renderCxoTab(A,rows);
+  else if(state.tab==='branch')   renderBranchTab(A,rows);
+  else                            renderCustomerTab(A);
   renderRail(A);
 
   menu('zoneMenu','zoneBtnLabel',
@@ -1083,7 +1542,9 @@ function render(){
     'Select all segments','Keep first segment only');
 
   document.getElementById('footNote').textContent =
-    `Source: ${IS_LIVE ? 'Live ledger records (this browser)' : 'Demo data — no live records found yet'} · ${DATA.rows.length} aggregated records · full data set ${inr(DATA.grand)} across ${ZONES.length} zones, ${BRANCHES.length} branches, ${CUSTS.length} customers. Hover any label for full wording.`;
+    `Source: ${IS_LIVE ? 'Live ledger records (this browser)' : 'Demo data — no live records found yet; dates shown are illustrative'} · ${DATA.rows.length} aggregated records` +
+    (DATE_MIN ? ` · dated ${fmtDay(DATE_MIN)} to ${fmtDay(DATE_MAX)}` : '') +
+    ` · full data set ${inr(DATA.grand)} across ${ZONES.length} zones, ${BRANCHES.length} branches, ${CUSTS.length} customers. Yesterday, Today and MTD follow the calendar; Yesterday falls back to the last day with entries if nothing was posted yesterday.`;
 }
 
 /* ===================== nav, tabs, clock ===================== */

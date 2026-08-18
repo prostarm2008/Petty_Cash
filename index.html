@@ -78,6 +78,9 @@
   .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
   .status-pill.online .status-dot { background: var(--primary); }
   .status-pill.offline .status-dot { background: var(--debit); }
+  .scope-note { font-size: 11px; color: var(--text-secondary); text-align: left; line-height: 1.5;
+    background: rgba(16,185,129,.06); border: 1px solid rgba(16,185,129,.25);
+    border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 14px; }
   .demo-box { font-size: 11px; color: var(--text-muted); margin-top: 16px; line-height: 1.5; text-align: left; background: rgba(255,255,255,.02); border: 1px dashed var(--border-color); border-radius: var(--radius-sm); padding: 10px 12px; }
   .demo-box code { color: var(--text-secondary); background: var(--bg-card); padding: 1px 5px; border-radius: 4px; }
   footer { margin-top: 18px; font-size: 10.5px; color: var(--text-muted); }
@@ -99,6 +102,7 @@
       <label for="loginRole">Portal Role</label>
       <select class="form-ctrl" id="loginRole" onchange="toggleLoginBranch()">
         <option value="admin">Head Office (HO Admin)</option>
+		<option value="regional">Regional</option>
         <option value="branch">Branch User</option>
       </select>
     </div>
@@ -106,6 +110,11 @@
     <div class="form-group" id="loginBranchGroup" style="display:none;">
       <label for="loginBranch">Assigned Branch</label>
       <select class="form-ctrl" id="loginBranch"></select>
+    </div>
+
+    <div class="scope-note" id="regionalNote" style="display:none;">
+      Regional logins cover multiple branches. Your branch list is pulled from the
+      user master after sign-in &mdash; no branch selection needed here.
     </div>
 
     <div class="form-group">
@@ -127,6 +136,7 @@
   <div class="demo-box" id="demoBox">
     Demo Access (used only when no Power Automate login endpoint is configured):<br>
     • HO Admin: <code>admin</code> / <code>admin</code><br>
+    • Regional: e.g. <code>shyamr</code> / <code>1234</code><br>
     • Branch User: Select branch / <code>1234</code>
   </div>
 
@@ -159,6 +169,43 @@
     {code:"WB_Kolkata", name:"Kolkata"}
   ];
 
+  /* ============================================================
+     REGIONAL MANAGER SCOPE
+     Mirrors the "Branch" column of User_Details.xlsx for the 7
+     regional logins. The Power Automate flow remains the source of
+     truth: whatever branch list it returns wins. This map is the
+     fallback used in demo mode, and a safety net if the flow
+     authenticates a regional user but returns no branch list.
+  ============================================================ */
+  const REGIONAL_SCOPE = {
+    shyamr:         ["KL_Kerala", "KN_Bangalore"],
+    ankitt:         ["PN_Mohali", "JK_Jammu"],
+    gabrielr:       ["TL_Hyderabad"],
+    pethuramasamyn: ["TN_Chennai", "TN_Coimbatore"],
+    anjanik:        ["RJ_Jaipur", "UP_Lucknow", "UP_Noida"],
+    bachhank:       ["AS_Guwahati", "BH_Patna", "JH_Ranchi", "OD_Bhubaneswar", "WB_Kolkata"],
+    rahulm:         ["CG_Chhattisgarh", "GJ_Ahmedabad", "MH_Mumbai", "MH_Nagpur", "MH_Pune", "MP_Bhopal"]
+  };
+
+  const VALID_BRANCH_CODES = BRANCH_CONFIG.map(b => b.code);
+
+  /* Accepts "KL_Kerala, KN_Bangalore", ["KL_Kerala","KN_Bangalore"],
+     semicolon or pipe separated — returns a clean, de-duplicated array
+     of codes that actually exist in BRANCH_CONFIG. */
+  function normalizeBranchList(value) {
+    if (!value) return [];
+    const raw = Array.isArray(value) ? value : String(value).split(/[,;|\n]+/);
+    const seen = {};
+    const out = [];
+    raw.forEach(item => {
+      const code = String(item).trim();
+      if (!code || seen[code]) return;
+      seen[code] = true;
+      if (VALID_BRANCH_CODES.indexOf(code) !== -1) out.push(code);
+    });
+    return out;
+  }
+
   const isAuthConfigured = AUTH_ENDPOINT.indexOf("REPLACE_WITH") !== 0 || AUTH_ENDPOINT.includes("http");
   const $ = (id) => document.getElementById(id);
 
@@ -186,11 +233,17 @@
   }
 
   function toggleLoginBranch() {
-    const isBranch = $('loginRole').value === 'branch';
+    const role = $('loginRole').value;
+    const isBranch = role === 'branch';
     $('loginBranchGroup').style.display = isBranch ? 'block' : 'none';
+    $('regionalNote').style.display = (role === 'regional') ? 'block' : 'none';
     if (isBranch && $('loginBranch').children.length === 0) {
       $('loginBranch').innerHTML = BRANCH_CONFIG.map(b => `<option value="${b.code}">${b.name}</option>`).join('');
     }
+    // Regional logins are always username-based, even in demo mode
+    const needsUsername = isAuthConfigured || role === 'regional';
+    $('lblUsername').style.display = needsUsername ? 'block' : 'none';
+    $('loginUsername').style.display = needsUsername ? 'block' : 'none';
   }
 
   function showLoginError(msg) {
@@ -235,12 +288,51 @@
     if (!data || data.success !== true) {
       throw new Error(data && data.message ? data.message : 'Invalid credentials.');
     }
-    return { role: data.role || role, branch: data.branch || branch, username: username || data.username || '', token: data.token || '' };
+
+    const resolvedRole = data.role || role;
+    const uname = (username || data.username || '').trim();
+    return buildActiveUser(resolvedRole, data.branches || data.branch || branch, uname, {
+      name: data.name || data.displayName || '',
+      email: data.email || '',
+      token: data.token || ''
+    });
   }
 
-  function handleDemoLogin(role, branch, pwd) {
-    if (role === 'admin' && pwd === 'admin') return { role: 'admin', branch: 'ALL' };
-    if (role === 'branch' && pwd === '1234') return { role: 'branch', branch };
+  /* Single place where role -> branch scope is decided, so the demo path
+     and the server path can never drift apart. */
+  function buildActiveUser(role, branchValue, username, extra) {
+    extra = extra || {};
+    const key = String(username || '').toLowerCase();
+
+    if (role === 'admin') {
+      return { role: 'admin', branch: 'ALL', branches: VALID_BRANCH_CODES.slice(),
+               username: username, name: extra.name || '', email: extra.email || '', token: extra.token || '' };
+    }
+
+    if (role === 'regional') {
+      let branches = normalizeBranchList(branchValue);
+      if (!branches.length) branches = normalizeBranchList(REGIONAL_SCOPE[key]);
+      if (!branches.length) {
+        throw new Error('No branches are mapped to this regional login. Please contact Head Office.');
+      }
+      return { role: 'regional', branch: branches[0], branches: branches,
+               username: username, name: extra.name || '', email: extra.email || '', token: extra.token || '' };
+    }
+
+    const one = normalizeBranchList(branchValue);
+    if (!one.length) throw new Error('No branch is mapped to this login. Please contact Head Office.');
+    return { role: 'branch', branch: one[0], branches: [one[0]],
+             username: username, name: extra.name || '', email: extra.email || '', token: extra.token || '' };
+  }
+
+  function handleDemoLogin(role, branch, username, pwd) {
+    if (role === 'admin' && pwd === 'admin') return buildActiveUser('admin', 'ALL', username || 'admin', {});
+    if (role === 'regional' && pwd === '1234') {
+      const scope = REGIONAL_SCOPE[String(username || '').toLowerCase()];
+      if (!scope) throw new Error('Unknown regional username.');
+      return buildActiveUser('regional', scope, username, {});
+    }
+    if (role === 'branch' && pwd === '1234') return buildActiveUser('branch', branch, username, {});
     return null;
   }
 
@@ -255,7 +347,7 @@
 
     if (role === 'branch' && !branch) { showLoginError('Please select your assigned branch.'); return; }
     if (!pwd) { showLoginError('Please enter your password.'); return; }
-    if (isAuthConfigured && !username) { showLoginError('Please enter your username.'); return; }
+    if ((isAuthConfigured || role === 'regional') && !username) { showLoginError('Please enter your username.'); return; }
 
     setLoginLoading(true);
     try {
@@ -263,7 +355,7 @@
       if (isAuthConfigured) {
         activeUser = await handleServerLogin(role, branch, username, pwd);
       } else {
-        activeUser = handleDemoLogin(role, branch, pwd);
+        activeUser = handleDemoLogin(role, branch, username, pwd);
         if (!activeUser) throw new Error('Invalid credentials.');
       }
       startSession(activeUser);
@@ -287,6 +379,7 @@
   })();
 
   initAuthModePill();
+  toggleLoginBranch();
 </script>
 </body>
 </html>
